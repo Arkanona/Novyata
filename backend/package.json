@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon .\\app.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "bcrypt": "latest",
@@ -16,6 +18,9 @@
     "pg": "latest"
   },
   "devDependencies": {
-    "nodemon": "latest"
+    "nodemon": "latest",
+    "@vitest/coverage-v8": "latest",
+    "supertest": "latest",
+    "vitest": "latest"
   }
 }

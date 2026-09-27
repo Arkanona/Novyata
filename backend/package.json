@@ -1,0 +1,21 @@
+{
+  "name": "novyata-backend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon .\\app.js",
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "bcrypt": "latest",
+    "cors": "latest",
+    "dotenv": "latest",
+    "express": "latest",
+    "jsonwebtoken": "latest",
+    "pg": "latest"
+  },
+  "devDependencies": {
+    "nodemon": "latest"
+  }
+}

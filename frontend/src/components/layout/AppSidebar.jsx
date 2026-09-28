@@ -26,7 +26,7 @@ export default function AppSidebar({ isOpen = false, onNavigate = () => {} }) {
       <Link to="/" onClick={onNavigate}><House size={18} />Accueil</Link>
     </nav>
     <div className="sidebar-bottom">
-      <button type="button"><Settings size={18} />Paramètres</button>
+      <NavLink to="/parametres" onClick={onNavigate} className={({ isActive }) => isActive ? 'active' : ''}><Settings size={18} />Paramètres</NavLink>
       <div className="profile"><span>{initials}</span><div><b>{user?.first_name} {user?.last_name}</b><small>{user?.email}</small></div></div>
       <button type="button" className="logout-button" onClick={handleLogout}><LogOut size={18} />Déconnexion</button>
     </div>

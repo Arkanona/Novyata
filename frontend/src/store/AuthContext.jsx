@@ -3,10 +3,18 @@ import { getCurrentUser, loginUser, registerUser } from '../services/authService
 
 const AuthContext = createContext(null)
 const TOKEN_KEY = 'novyata_auth_token'
+const THEME_KEY = 'novyata_theme'
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [theme, setThemePreference] = useState(() => localStorage.getItem(THEME_KEY) || 'light')
+
+  useEffect(() => {
+    const dark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+    localStorage.setItem(THEME_KEY, theme)
+  }, [theme])
 
   useEffect(() => {
     const token = localStorage.getItem(TOKEN_KEY)
@@ -43,7 +51,7 @@ export function AuthProvider({ children }) {
     setUser(null)
   }
 
-  return <AuthContext.Provider value={{ user, isLoading, login, register, logout, isAuthenticated: Boolean(user) }}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={{ user, setUser, theme, setTheme: setThemePreference, isLoading, login, register, logout, isAuthenticated: Boolean(user) }}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {

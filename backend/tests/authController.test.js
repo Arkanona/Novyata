@@ -8,7 +8,7 @@ vi.mock('../src/config/database.js', () => ({ requireDatabase: vi.fn() }))
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import { requireDatabase } from '../src/config/database.js'
-import { login, me, register } from '../src/controllers/authController.js'
+import { changePassword, deleteAccount, login, me, register, updateProfile } from '../src/controllers/authController.js'
 
 const user = { id_user: '8b74e3e1-64b4-46f1-bfd8-c50a174cf908', first_name: 'Marie', last_name: 'Laurent', email: 'marie@example.com', password: 'hash', created_at: '2026-01-01' }
 
@@ -151,5 +151,24 @@ describe('authController', () => {
     const next = vi.fn()
     await me({ auth: { sub: user.id_user } }, createResponse(), next)
     expect(next.mock.calls[0][0].message).toBe('database unavailable')
+  })
+
+  it('updates only the authenticated user profile', async () => {
+    const database = { query: vi.fn().mockResolvedValue({ rows: [user] }) }; requireDatabase.mockReturnValue(database)
+    const res = createResponse(); await updateProfile({ auth: { sub: user.id_user }, body: { first_name: 'Julie', last_name: 'Laurent', email: 'julie@example.com' } }, res, vi.fn())
+    expect(database.query.mock.calls[0][1]).toEqual(['Julie', 'Laurent', 'julie@example.com', user.id_user])
+    expect(res.json).toHaveBeenCalled()
+  })
+
+  it('rejects an incorrect current password before changing it', async () => {
+    const database = { query: vi.fn().mockResolvedValue({ rows: [user] }) }; requireDatabase.mockReturnValue(database); bcrypt.compare.mockResolvedValue(false)
+    const next = vi.fn(); await changePassword({ auth: { sub: user.id_user }, body: { current_password: 'bad', new_password: 'Password123', confirmation: 'Password123' } }, createResponse(), next)
+    expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 400 })
+  })
+
+  it('deletes the authenticated account and relies on database cascades for related data', async () => {
+    requireDatabase.mockReturnValue({ query: vi.fn().mockResolvedValue({ rows: [{ id_user: user.id_user }] }) }); const res = createResponse()
+    await deleteAccount({ auth: { sub: user.id_user } }, res, vi.fn())
+    expect(res.status).toHaveBeenCalledWith(204)
   })
 })

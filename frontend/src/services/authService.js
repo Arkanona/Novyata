@@ -2,8 +2,8 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
 async function request(path, options = {}) {
   const response = await fetch(API_URL + path, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
     ...options,
+    headers: { 'Content-Type': 'application/json', ...options.headers },
   })
   const data = await response.json().catch(() => ({}))
 
@@ -27,3 +27,7 @@ export function loginUser(payload) {
 export function getCurrentUser(token) {
   return request('/api/v1/auth/me', { headers: { Authorization: 'Bearer ' + token } })
 }
+function authenticated(path, method, payload) { return request(path, { method, headers: { Authorization: 'Bearer ' + localStorage.getItem('novyata_auth_token') }, ...(payload ? { body: JSON.stringify(payload) } : {}) }) }
+export const updateProfile = (payload) => authenticated('/api/v1/auth/me', 'PATCH', payload)
+export const changePassword = (payload) => authenticated('/api/v1/auth/me/password', 'PATCH', payload)
+export const deleteAccount = () => authenticated('/api/v1/auth/me', 'DELETE')

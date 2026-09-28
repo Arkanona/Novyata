@@ -100,3 +100,37 @@ export async function me(req, res, next) {
     return next(error)
   }
 }
+
+export async function updateProfile(req, res, next) {
+  try {
+    const { firstName, lastName, email } = validateRegister({ ...req.body, password: 'temporary-password' })
+    const result = await requireDatabase().query('update users set first_name = $1, last_name = $2, email = $3, updated_at = now() where id_user = $4 returning id_user, first_name, last_name, email, created_at', [firstName, lastName, email, req.auth.sub])
+    if (!result.rows[0]) throw new ApiError(404, 'Utilisateur introuvable.')
+    return res.json({ user: serializeUser(result.rows[0]) })
+  } catch (error) { if (error.code === '23505') return next(new ApiError(409, 'Cette adresse e-mail est déjà utilisée.')); return next(error) }
+}
+
+export async function changePassword(req, res, next) {
+  try {
+    const { current_password: currentPassword, new_password: newPassword, confirmation } = req.body
+    const errors = {}
+    if (!currentPassword) errors.current_password = 'Mot de passe actuel requis.'
+    if (typeof newPassword !== 'string' || newPassword.length < 8) errors.new_password = 'Le nouveau mot de passe doit contenir au moins 8 caractères.'
+    if (newPassword !== confirmation) errors.confirmation = 'Les mots de passe ne correspondent pas.'
+    if (Object.keys(errors).length) throw new ApiError(400, 'Certaines informations sont invalides.', errors)
+    const database = requireDatabase(); const found = await database.query('select password from users where id_user = $1', [req.auth.sub])
+    if (!found.rows[0]) throw new ApiError(404, 'Utilisateur introuvable.')
+    if (!(await bcrypt.compare(currentPassword, found.rows[0].password))) throw new ApiError(400, 'Le mot de passe actuel est incorrect.', { current_password: 'Mot de passe actuel incorrect.' })
+    const hash = await bcrypt.hash(newPassword, 12)
+    await database.query('update users set password = $1, updated_at = now() where id_user = $2', [hash, req.auth.sub])
+    return res.status(204).send()
+  } catch (error) { return next(error) }
+}
+
+export async function deleteAccount(req, res, next) {
+  try {
+    const result = await requireDatabase().query('delete from users where id_user = $1 returning id_user', [req.auth.sub])
+    if (!result.rows[0]) throw new ApiError(404, 'Utilisateur introuvable.')
+    return res.status(204).send()
+  } catch (error) { return next(error) }
+}

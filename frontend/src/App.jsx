@@ -7,6 +7,7 @@ import HomePage from './pages/HomePage'
 import NotFoundPage from './pages/NotFoundPage'
 import ResumeEditorPage from './pages/ResumeEditorPage'
 import ResumeListPage from './pages/ResumeListPage'
+import SettingsPage from './pages/SettingsPage'
 import { AuthProvider } from './store/AuthContext'
 
 export default function App() {
@@ -19,6 +20,7 @@ export default function App() {
       <Route path="/cv" element={<ResumeListPage />} />
       <Route path="/cv/nouveau" element={<ResumeEditorPage isNew />} />
       <Route path="/cv/:id" element={<ResumeEditorPage />} />
+      <Route path="/parametres" element={<SettingsPage />} />
     </Route></Route>
     <Route path="*" element={<NotFoundPage />} />
   </Routes></AuthProvider></BrowserRouter>

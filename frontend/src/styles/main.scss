@@ -205,7 +205,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .template-preview .resume-preview-paper section { margin-top: 20px; }
 .template-preview.font-small .resume-preview-paper { font-size: 11px; }.template-preview.font-large .resume-preview-paper { font-size: 13px; }
 .template-preview .cv-section-title { display: flex; align-items: center; gap: 8px; margin: 0; padding: 0; border: 0; color: var(--resume-accent); font-size: 11px; letter-spacing: .13em; line-height: 1.2; text-transform: uppercase; }
-.template-preview .cv-section-title::after { content: ''; flex: 1; height: 1px; background: color-mix(in srgb, var(--resume-accent) 50%, #fff); }
+.template-preview .cv-section-title::after { content: ''; flex: 1; height: 1px; background: #c8d4e3; }
 
 .classic-template { padding: 38px 44px; font-family: Inter, Arial, sans-serif; color: #142c4a; }
 .classic-header { padding-bottom: 17px; text-align: center; }
@@ -249,3 +249,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .resume-preview-stage { width: calc(594px * var(--preview-scale)); height: calc(842px * var(--preview-scale)); }
 .resume-preview-stage > .template-preview { width: 594px; transform: scale(var(--preview-scale)); transform-origin: top left; }
 .resume-preview-stage .resume-preview-paper { width: 594px; height: 842px; min-height: 842px; aspect-ratio: auto; }
+.resume-preview-with-action { min-width: 0; background: #f1f3f4; }.pdf-export-action { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 0 0 34px; }.pdf-export-action .editor-feedback { width: min(100% - 30px, 594px); margin: 10px 0 0; }
+.resume-pdf-export-host { position: fixed; top: 0; left: -10000px; width: 594px; background: #fff; pointer-events: none; }.resume-pdf-export-host .template-preview--pdf .resume-preview-paper { width: 594px; height: auto; min-height: 842px; overflow: visible; box-shadow: none; }.resume-pdf-export-host .template-preview--pdf .modern-layout { min-height: 842px; height: auto; }.resume-pdf-export-host .template-preview--pdf .classic-entry, .resume-pdf-export-host .template-preview--pdf .modern-entry, .resume-pdf-export-host .template-preview--pdf .minimal-entry { break-inside: avoid; page-break-inside: avoid; }
+
+/* Keep the role and organisation together, with the date and location aligned on the right. */
+.modern-entry { grid-template-columns: minmax(0, 1fr) 104px; }.modern-entry::before { display: none; }.modern-entry-meta { color: #64748b; font-size: 8px; line-height: 1.45; text-align: right; }.modern-entry-meta span { display: block; }

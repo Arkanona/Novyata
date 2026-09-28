@@ -1,0 +1,14 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createResponse } from './helpers.js'
+vi.mock('../src/config/database.js', () => ({ requireDatabase: vi.fn() }))
+import { requireDatabase } from '../src/config/database.js'
+import { createLanguage, createSkill, deleteLanguage, deleteSkill, updateLanguage, updateSkill } from '../src/controllers/resumeTagController.js'
+
+const userId = '8b74e3e1-64b4-46f1-bfd8-c50a174cf908'; const resumeId = 'f8c5d2f2-6ff2-43d2-9e4f-5443200f6d4b'; const skillId = '1e2c3d4e-6ff2-43d2-9e4f-5443200f6d4b'; const languageId = '2e2c3d4e-6ff2-43d2-9e4f-5443200f6d4b'
+const skill = { id_skill: skillId, name: 'React', level: 'Expert' }; const language = { id_language: languageId, name: 'Anglais', level: 'Courant' }
+describe('resumeTagController', () => {
+  beforeEach(() => vi.clearAllMocks())
+  it('creates, updates and deletes a skill owned by the user', async () => { const database = { query: vi.fn().mockResolvedValueOnce({ rows: [skill] }).mockResolvedValueOnce({ rows: [skill] }).mockResolvedValueOnce({ rows: [skill] }) }; requireDatabase.mockReturnValue(database); const created = createResponse(); await createSkill({ auth: { sub: userId }, params: { id: resumeId }, body: skill }, created, vi.fn()); await updateSkill({ auth: { sub: userId }, params: { id: resumeId, skillId }, body: skill }, createResponse(), vi.fn()); const deleted = createResponse(); await deleteSkill({ auth: { sub: userId }, params: { id: resumeId, skillId } }, deleted, vi.fn()); expect(created.status).toHaveBeenCalledWith(201); expect(deleted.status).toHaveBeenCalledWith(204) })
+  it('creates, updates and deletes a language owned by the user', async () => { const database = { query: vi.fn().mockResolvedValueOnce({ rows: [language] }).mockResolvedValueOnce({ rows: [language] }).mockResolvedValueOnce({ rows: [language] }) }; requireDatabase.mockReturnValue(database); const created = createResponse(); await createLanguage({ auth: { sub: userId }, params: { id: resumeId }, body: language }, created, vi.fn()); await updateLanguage({ auth: { sub: userId }, params: { id: resumeId, languageId }, body: language }, createResponse(), vi.fn()); const deleted = createResponse(); await deleteLanguage({ auth: { sub: userId }, params: { id: resumeId, languageId } }, deleted, vi.fn()); expect(created.status).toHaveBeenCalledWith(201); expect(deleted.status).toHaveBeenCalledWith(204) })
+  it('refuses another user and missing tag resources', async () => { requireDatabase.mockReturnValue({ query: vi.fn().mockResolvedValue({ rows: [] }) }); const next = vi.fn(); await updateSkill({ auth: { sub: userId }, params: { id: resumeId, skillId }, body: skill }, createResponse(), next); await deleteLanguage({ auth: { sub: userId }, params: { id: resumeId, languageId } }, createResponse(), next); expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 404 }); expect(next.mock.calls[1][0]).toMatchObject({ statusCode: 404 }) })
+})

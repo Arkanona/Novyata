@@ -31,3 +31,24 @@ export function getResume(id) {
 export function createResume(payload) {
   return request('/api/v1/resumes', { method: 'POST', body: JSON.stringify(payload) })
 }
+
+export function updateResume(id, payload) {
+  return request('/api/v1/resumes/' + id, { method: 'PATCH', body: JSON.stringify(payload) })
+}
+
+export function deleteResume(id) {
+  return request('/api/v1/resumes/' + id, { method: 'DELETE' })
+}
+
+export function createExperience(resumeId, payload) { return request('/api/v1/resumes/' + resumeId + '/experiences', { method: 'POST', body: JSON.stringify(payload) }) }
+export function updateExperience(resumeId, experienceId, payload) { return request('/api/v1/resumes/' + resumeId + '/experiences/' + experienceId, { method: 'PATCH', body: JSON.stringify(payload) }) }
+export function deleteExperience(resumeId, experienceId) { return request('/api/v1/resumes/' + resumeId + '/experiences/' + experienceId, { method: 'DELETE' }) }
+export function createEducation(resumeId, payload) { return request('/api/v1/resumes/' + resumeId + '/educations', { method: 'POST', body: JSON.stringify(payload) }) }
+export function updateEducation(resumeId, educationId, payload) { return request('/api/v1/resumes/' + resumeId + '/educations/' + educationId, { method: 'PATCH', body: JSON.stringify(payload) }) }
+export function deleteEducation(resumeId, educationId) { return request('/api/v1/resumes/' + resumeId + '/educations/' + educationId, { method: 'DELETE' }) }
+export function createSkill(resumeId, payload) { return request('/api/v1/resumes/' + resumeId + '/skills', { method: 'POST', body: JSON.stringify(payload) }) }
+export function updateSkill(resumeId, skillId, payload) { return request('/api/v1/resumes/' + resumeId + '/skills/' + skillId, { method: 'PATCH', body: JSON.stringify(payload) }) }
+export function deleteSkill(resumeId, skillId) { return request('/api/v1/resumes/' + resumeId + '/skills/' + skillId, { method: 'DELETE' }) }
+export function createLanguage(resumeId, payload) { return request('/api/v1/resumes/' + resumeId + '/languages', { method: 'POST', body: JSON.stringify(payload) }) }
+export function updateLanguage(resumeId, languageId, payload) { return request('/api/v1/resumes/' + resumeId + '/languages/' + languageId, { method: 'PATCH', body: JSON.stringify(payload) }) }
+export function deleteLanguage(resumeId, languageId) { return request('/api/v1/resumes/' + resumeId + '/languages/' + languageId, { method: 'DELETE' }) }

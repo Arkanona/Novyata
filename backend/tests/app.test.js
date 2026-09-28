@@ -32,6 +32,14 @@ describe('API routes', () => {
     expect(response.headers['access-control-allow-origin']).toBe('http://localhost:5174')
   })
 
+  it('rejects origins that are not explicitly allowed', async () => {
+    const response = await request(app)
+      .get('/api/health')
+      .set('Origin', 'https://untrusted.example')
+    expect(response.status).toBe(500)
+    expect(response.body.error.message).toBe('Une erreur interne est survenue.')
+  })
+
   it('returns structured 404 errors', async () => {
     const response = await request(app).get('/api/unknown')
     expect(response.status).toBe(404)

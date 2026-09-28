@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createResume, getResume, getResumes } from './resumeService'
+import { createResume, deleteResume, getResume, getResumes, updateResume } from './resumeService'
 
 describe('resumeService', () => {
   beforeEach(() => localStorage.setItem('novyata_auth_token', 'jwt-token'))
@@ -14,9 +14,13 @@ describe('resumeService', () => {
     await getResumes()
     await getResume('resume-id')
     await createResume({ title_resume: 'CV', first_name: 'Marie', last_name: 'Laurent', job_title: 'Designer' })
-    expect(fetchMock).toHaveBeenCalledTimes(3)
+    await updateResume('resume-id', { first_name: 'Marie' })
+    await deleteResume('resume-id')
+    expect(fetchMock).toHaveBeenCalledTimes(5)
     expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer jwt-token')
     expect(fetchMock.mock.calls[1][0]).toContain('/api/v1/resumes/resume-id')
     expect(fetchMock.mock.calls[2][1].method).toBe('POST')
+    expect(fetchMock.mock.calls[3][1].method).toBe('PATCH')
+    expect(fetchMock.mock.calls[4][1].method).toBe('DELETE')
   })
 })

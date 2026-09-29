@@ -17,6 +17,12 @@ describe('API routes', () => {
     expect(response.body.error.message).toBe('Authentification requise.')
   })
 
+  it('exposes the current-user endpoint and protects it without a token', async () => {
+    const response = await request(app).get('/api/v1/auth/me')
+    expect(response.status).toBe(401)
+    expect(response.body.error.message).toBe('Authentification requise.')
+  })
+
   it('keeps the applications placeholder contract stable', async () => {
     const response = await request(app).get('/api/applications')
     expect(response.status).toBe(200)

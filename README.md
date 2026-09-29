@@ -26,12 +26,12 @@ npm install
 npm run dev
 ```
 
-`npm run dev` démarre maintenant l’API avec Nodemon et la redémarre automatiquement à chaque modification dans `backend/src`.
+`npm run dev` démarre l’API depuis `backend/src/server.js` avec Nodemon et la redémarre automatiquement à chaque modification dans `backend/src`.
 
 Vous pouvez aussi lancer directement, depuis le dossier `backend` :
 
 ```powershell
-nodemon .\app.js
+nodemon .\src\server.js
 ```
 
 Copiez `backend/.env.example` vers `backend/.env` et renseignez la chaîne de connexion Supabase lorsque la persistance sera mise en place.

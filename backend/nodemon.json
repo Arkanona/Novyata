@@ -5,5 +5,5 @@
     ".env"
   ],
   "ext": "js,mjs,cjs,json,env",
-  "exec": "node app.js"
+  "exec": "node"
 }

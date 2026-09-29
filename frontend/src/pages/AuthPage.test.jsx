@@ -42,4 +42,14 @@ describe('AuthPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /créer mon compte/i }))
     await waitFor(() => expect(register).toHaveBeenCalledWith({ first_name: 'Marie', last_name: 'Laurent', email: 'marie@example.com', password: 'Password123' }))
   })
+
+  it('reveals and masks the password on demand', () => {
+    renderPage('login')
+    const password = screen.getByLabelText('Mot de passe')
+    expect(password.type).toBe('password')
+    fireEvent.click(screen.getByRole('button', { name: 'Afficher le mot de passe' }))
+    expect(password.type).toBe('text')
+    fireEvent.click(screen.getByRole('button', { name: 'Masquer le mot de passe' }))
+    expect(password.type).toBe('password')
+  })
 })

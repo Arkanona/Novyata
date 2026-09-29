@@ -7,6 +7,7 @@ import ApplicationListPage from './pages/ApplicationListPage'
 import CoverLetterEditorPage from './pages/CoverLetterEditorPage'
 import CoverLetterListPage from './pages/CoverLetterListPage'
 import DashboardPage from './pages/DashboardPage'
+import JobAnalysisPage from './pages/JobAnalysisPage'
 import HomePage from './pages/HomePage'
 import NotFoundPage from './pages/NotFoundPage'
 import ResumeEditorPage from './pages/ResumeEditorPage'
@@ -30,6 +31,7 @@ export default function App() {
       <Route path="/candidatures" element={<ApplicationListPage />} />
       <Route path="/candidatures/nouvelle" element={<ApplicationEditorPage isNew />} />
       <Route path="/candidatures/:id" element={<ApplicationEditorPage />} />
+      <Route path="/analyse-offre" element={<JobAnalysisPage />} />
       <Route path="/parametres" element={<SettingsPage />} />
     </Route></Route>
     <Route path="*" element={<NotFoundPage />} />

@@ -9,6 +9,17 @@ export function dateRange(item) {
   return [formatDate(item.start_date), item.is_current ? 'Aujourd’hui' : formatDate(item.end_date)].filter(Boolean).join(' — ')
 }
 
+function compactDate(date) {
+  if (!date) return ''
+  const [year, month, day] = String(date).slice(0, 10).split('-').map(Number)
+  if (!year || !month || !day) return ''
+  return new Intl.DateTimeFormat('fr-FR', { month: 'short', year: 'numeric' }).format(new Date(Date.UTC(year, month - 1, day))).replace('.', '')
+}
+
+export function compactDateRange(item) {
+  return [compactDate(item.start_date), item.is_current ? 'Aujourd’hui' : compactDate(item.end_date)].filter(Boolean).join(' — ')
+}
+
 export function byNewest(items = []) { return [...items].filter(Boolean).sort((a, b) => (b.start_date || '').localeCompare(a.start_date || '')) }
 
 export function content(resume) {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import PersonalInfoForm from './PersonalInfoForm'
 import ResumePreview from './ResumePreview'
 import ResumeSections from './ResumeSections'
@@ -10,6 +10,7 @@ import Button from '../common/Button'
 
 const editableFields = ['first_name', 'last_name', 'job_title', 'email', 'phone', 'city', 'summary', 'template_key', 'accent_color', 'font_size']
 const defaults = { template_key: 'classic', accent_color: '#314A67', font_size: 'normal' }
+export const RESUME_OVERFLOW_WARNING = 'Votre CV dépasse une page A4. Réduisez certaines descriptions ou choisissez une taille de texte plus compacte.'
 
 export default function ResumeEditor({ resume, onSaved }) {
   const toForm = (current) => Object.fromEntries(editableFields.map((field) => [field, current[field] || defaults[field] || '']))
@@ -23,6 +24,7 @@ export default function ResumeEditor({ resume, onSaved }) {
   const [educations, setEducations] = useState(resume.educations || [])
   const [skills, setSkills] = useState(resume.skills || [])
   const [languages, setLanguages] = useState(resume.languages || [])
+  const [hasVerticalOverflow, setHasVerticalOverflow] = useState(false)
 
   useEffect(() => { setForm(toForm(resume)); setExperiences(resume.experiences || []); setEducations(resume.educations || []); setSkills(resume.skills || []); setLanguages(resume.languages || []) }, [resume])
   function handleChange(event) { const { name, value } = event.target; setForm((current) => ({ ...current, [name]: value })); setErrors((current) => ({ ...current, [name]: '' })); setFeedback('') }
@@ -30,10 +32,11 @@ export default function ResumeEditor({ resume, onSaved }) {
   function handleSubmit(event) { event.preventDefault(); save(form) }
   function saveAppearance(patch) { const next = { ...form, ...patch }; setForm(next); save(next, { showSuccess: false }) }
   const previewResume = { ...form, experiences, educations, skills, languages }
+  const handleOverflowChange = useCallback((nextValue) => setHasVerticalOverflow(nextValue), [])
   async function handlePdfExport() {
     setIsExporting(true)
     setExportError('')
     try { await exportResumePdf({ ...resume, ...previewResume }) } catch (error) { setExportError(error.code === 'PDF_CONTENT_OVERFLOW' ? PDF_OVERFLOW_MESSAGE : (error.message || 'La génération du PDF a échoué.')) } finally { setIsExporting(false) }
   }
-  return <div className="resume-editor-layout"><div className="resume-editor-panel"><PersonalInfoForm form={form} errors={errors} isSaving={isSaving} onChange={handleChange} onSubmit={handleSubmit} />{feedback && <p className={Object.keys(errors).some((key) => errors[key]) ? 'editor-feedback editor-feedback--error' : 'editor-feedback'} role="status">{feedback}</p>}<TemplateSelector resume={previewResume} onChange={saveAppearance} /><ResumeSections resumeId={resume.id_resume} experiences={experiences} educations={educations} setExperiences={setExperiences} setEducations={setEducations} /><ResumeTags resumeId={resume.id_resume} skills={skills} languages={languages} experiences={experiences} setSkills={setSkills} setLanguages={setLanguages} /></div><div className="resume-preview-with-action"><ResumePreview resume={previewResume} /><div className="pdf-export-action"><Button type="button" onClick={handlePdfExport} disabled={isExporting || isSaving}>{isExporting ? 'Génération du PDF…' : 'Télécharger en PDF'}</Button>{exportError && <p className="editor-feedback editor-feedback--error" role="alert">{exportError}</p>}</div></div></div>
+  return <div className="resume-editor-layout"><div className="resume-editor-panel"><PersonalInfoForm form={form} errors={errors} isSaving={isSaving} onChange={handleChange} onSubmit={handleSubmit} />{feedback && <p className={Object.keys(errors).some((key) => errors[key]) ? 'editor-feedback editor-feedback--error' : 'editor-feedback'} role="status">{feedback}</p>}{hasVerticalOverflow && <p className="editor-feedback editor-feedback--warning" role="alert">{RESUME_OVERFLOW_WARNING}</p>}<TemplateSelector resume={previewResume} onChange={saveAppearance} /><ResumeSections resumeId={resume.id_resume} experiences={experiences} educations={educations} setExperiences={setExperiences} setEducations={setEducations} /><ResumeTags resumeId={resume.id_resume} skills={skills} languages={languages} experiences={experiences} setSkills={setSkills} setLanguages={setLanguages} /></div><div className="resume-preview-with-action"><ResumePreview resume={previewResume} onOverflowChange={handleOverflowChange} /><div className="pdf-export-action"><Button type="button" onClick={handlePdfExport} disabled={isExporting || isSaving}>{isExporting ? 'Génération du PDF…' : 'Télécharger en PDF'}</Button>{exportError && <p className="editor-feedback editor-feedback--error" role="alert">{exportError}</p>}</div></div></div>
 }

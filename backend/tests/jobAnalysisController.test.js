@@ -13,7 +13,7 @@ const userId = '8b74e3e1-64b4-46f1-bfd8-c50a174cf908'
 const otherUserId = '3f6070dc-e2c2-48e0-9089-a07155fbec2f'
 const resumeId = 'f8c5d2f2-6ff2-43d2-9e4f-5443200f6d4b'
 const body = { resumeId, jobDescription: 'Nous recherchons un Product Designer maîtrisant Figma, la recherche utilisateur et les tests.' }
-const validAnalysis = { matchScore: 72, matchedSkills: ['Figma'], missingSkills: ['Recherche utilisateur'], importantKeywords: ['Produit', 'Tests'], suggestions: ['Ajoutez un exemple de test utilisateur.'] }
+const validAnalysis = { matchScore: 72, matchedSkills: ['Figma'], skillsToStrengthen: [{ skill: 'Figma', detail: 'Ajoutez un usage concret.' }], missingSkills: [{ skill: 'Recherche utilisateur', message: 'Recherche utilisateur non mentionné — à mentionner uniquement si vous maîtrisez cette compétence.' }], importantKeywords: ['Produit', 'Tests'], suggestions: ['Ajoutez un exemple de test utilisateur.'] }
 
 describe('jobAnalysisController', () => {
   beforeEach(() => vi.clearAllMocks())

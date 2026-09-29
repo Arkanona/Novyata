@@ -1,4 +1,4 @@
-import { FileText, House, LayoutDashboard, LogOut, Settings } from 'lucide-react'
+import { BriefcaseBusiness, FileText, House, LayoutDashboard, LogOut, Mail, Settings } from 'lucide-react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import Logo from '../common/Logo'
 import { useAuth } from '../../store/AuthContext'
@@ -6,6 +6,8 @@ import { useAuth } from '../../store/AuthContext'
 const navigation = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Vue d’ensemble' },
   { to: '/cv', icon: FileText, label: 'Mes CV' },
+  { to: '/lettres', icon: Mail, label: 'Lettres de motivation' },
+  { to: '/candidatures', icon: BriefcaseBusiness, label: 'Candidatures' },
 ]
 
 export default function AppSidebar({ isOpen = false, onNavigate = () => {} }) {

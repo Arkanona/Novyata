@@ -1,45 +1,111 @@
 # Novyata
 
-Base de projet pour un SaaS de création de CV et de suivi de candidatures.
+Novyata est un SaaS de création de CV. Il permet de créer, personnaliser, enregistrer et exporter des CV professionnels, tout en conservant un espace utilisateur sécurisé.
 
-## Architecture actuelle
+La direction graphique de référence est disponible dans [DESIGN.md](./DESIGN.md).
 
-- `frontend/` : interface React (JSX uniquement), Vite, Sass et routes de navigation.
-- `backend/` : API Express, point d’entrée applicatif et configuration PostgreSQL/Supabase.
-- `database/schema.sql` : schéma relationnel initial du MVP (`users`, `resumes` et les sections d’un CV).
+## Stack
 
-Les routes front préparées sont : `/`, `/connexion`, `/inscription`, `/dashboard`, `/cv`, `/cv/nouveau`, `/cv/:id` et la page 404. L’authentification et la protection des routes seront ajoutées dans les étapes suivantes.
+- Frontend : React, Vite, JSX et Sass.
+- Backend : Node.js et Express.
+- Base de données : PostgreSQL hébergée sur Supabase.
+- Authentification : JWT et bcrypt.
 
-## Démarrer
+## Prérequis
+
+- Node.js 20 ou plus récent.
+- Un projet Supabase avec une base PostgreSQL.
+
+## Installation
+
+Installez les dépendances de chaque application :
 
 ```bash
 cd frontend
 npm install
+
+cd ../backend
+npm install
+```
+
+## Variables d’environnement
+
+Copiez les fichiers d’exemple sans commiter les fichiers `.env` créés :
+
+```powershell
+Copy-Item backend/.env.example backend/.env
+Copy-Item frontend/.env.example frontend/.env
+```
+
+Variables backend attendues :
+
+| Variable | Description |
+| --- | --- |
+| `PORT` | Port de l’API, `3000` par défaut. |
+| `DATABASE_URL` | Chaîne de connexion PostgreSQL fournie par Supabase. |
+| `JWT_SECRET` | Secret JWT long, aléatoire et privé. |
+| `JWT_EXPIRES_IN` | Durée de validité d’un jeton, par exemple `7d`. |
+| `CORS_ORIGIN` | URL du frontend, par exemple `http://localhost:5173`. |
+
+Variable frontend attendue :
+
+| Variable | Description |
+| --- | --- |
+| `VITE_API_URL` | URL publique de l’API, par exemple `http://localhost:3000`. |
+
+Dans le SQL Editor de Supabase, exécutez [database/schema.sql](./database/schema.sql). Le script crée les tables `users`, `resumes`, `experiences`, `educations`, `skills` et `languages`, avec leurs relations et index.
+
+## Lancer le projet
+
+Dans un premier terminal :
+
+```bash
+cd backend
 npm run dev
+```
+
+Nodemon démarre l’API sur `http://localhost:3000`. Depuis le dossier `backend`, vous pouvez aussi utiliser :
+
+```powershell
+nodemon .\app.js
 ```
 
 Dans un second terminal :
 
 ```bash
-cd backend
-npm install
+cd frontend
 npm run dev
 ```
 
-`npm run dev` démarre l’API depuis `backend/src/server.js` avec Nodemon et la redémarre automatiquement à chaque modification dans `backend/src`.
+Vite démarre le frontend sur `http://localhost:5173`.
 
-Vous pouvez aussi lancer directement, depuis le dossier `backend` :
+## Commandes de vérification
 
-```powershell
-nodemon .\src\server.js
+```bash
+# Tests backend
+cd backend
+npm test
+
+# Couverture backend
+npm run test:coverage
+
+# Tests frontend
+cd ../frontend
+npm test
+
+# Build de production frontend
+npm run build
 ```
 
-Copiez `backend/.env.example` vers `backend/.env` et renseignez la chaîne de connexion Supabase lorsque la persistance sera mise en place.
+## Fonctionnalités disponibles
 
-## Authentification
+- Inscription, connexion, déconnexion et maintien de session JWT.
+- Protection des routes privées.
+- Profil utilisateur, changement de mot de passe et suppression de compte.
+- Création, édition, consultation et suppression de CV.
+- Expériences, formations, compétences et langues reliées à chaque CV.
+- Aperçu A4 en direct.
+- Templates Classique, Moderne et Minimal, avec couleur et taille de texte personnalisables.
+- Export d’un CV au format PDF.
 
-Créez `backend/.env` à partir de `backend/.env.example`, renseignez DATABASE_URL, JWT_SECRET, JWT_EXPIRES_IN et CORS_ORIGIN, puis exécutez `database/schema.sql` dans le SQL Editor de Supabase.
-
-L’API expose POST /api/v1/auth/register, POST /api/v1/auth/login et GET /api/v1/auth/me.
-
-La direction visuelle de référence est documentée dans `DESIGN.md`.
+Le suivi des candidatures et les lettres de motivation ne font pas encore partie des fonctionnalités disponibles.

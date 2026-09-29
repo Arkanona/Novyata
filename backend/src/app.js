@@ -2,6 +2,7 @@ import cors from 'cors'
 import express from 'express'
 import applicationsRouter from './routes/applications.js'
 import authRouter from './routes/auth.js'
+import coverLettersRouter from './routes/coverLetters.js'
 import resumesRouter from './routes/resumes.js'
 import { errorHandler, notFound } from './middleware/errorHandler.js'
 
@@ -28,8 +29,10 @@ app.get('/api/health', (req, res) => res.json({
   databaseConfigured: Boolean(process.env.DATABASE_URL),
   jwtConfigured: Boolean(process.env.JWT_SECRET),
 }))
-app.use('/api/applications', applicationsRouter)
+app.get('/api/applications', (req, res) => res.json({ applications: [] }))
+app.use('/api/v1/applications', applicationsRouter)
 app.use('/api/v1/auth', authRouter)
+app.use('/api/v1/cover-letters', coverLettersRouter)
 app.use('/api/v1/resumes', resumesRouter)
 app.use(notFound)
 app.use(errorHandler)

@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+# Les espaces connectés sont privés et ne doivent pas être indexés.
+Disallow: /dashboard
+Disallow: /cv
+Disallow: /lettres
+Disallow: /candidatures
+Disallow: /analyse-offre
+Disallow: /parametres

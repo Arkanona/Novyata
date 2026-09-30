@@ -2,8 +2,8 @@ import { BriefcaseBusiness, FileText, Mail } from 'lucide-react'
 
 const features = [
   { icon: FileText, title: 'CV', text: 'Un éditeur clair pour composer un CV professionnel, à votre rythme.', status: 'Disponible' },
-  { icon: Mail, title: 'Lettre de motivation', text: 'Gardez vos lettres à portée de main et adaptez-les à chaque opportunité.', status: 'Bientôt disponible' },
-  { icon: BriefcaseBusiness, title: 'Suivi des candidatures', text: 'Visualisez vos démarches et les prochaines étapes de votre recherche.', status: 'Bientôt disponible' },
+  { icon: Mail, title: 'Lettre de motivation', text: 'Gardez vos lettres à portée de main et adaptez-les à chaque opportunité.', status: 'Disponible' },
+  { icon: BriefcaseBusiness, title: 'Suivi des candidatures', text: 'Visualisez vos démarches et les prochaines étapes de votre recherche.', status: 'Disponible' },
 ]
 
 export default function FeatureSection() {

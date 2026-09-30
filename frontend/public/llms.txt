@@ -1,0 +1,18 @@
+# Novyata
+
+Novyata est un SaaS français qui aide les candidats à créer et personnaliser leurs documents de candidature.
+
+## Pages publiques
+
+- [Accueil](/) — présentation de Novyata et de ses fonctionnalités.
+- [Connexion](/connexion) — accès à un espace utilisateur existant.
+- [Inscription](/inscription) — création d’un compte Novyata.
+
+## Fonctionnalités principales
+
+- Création, personnalisation et export PDF de CV.
+- Gestion de lettres de motivation avec aperçu A4.
+- Suivi des candidatures, statuts, recherches et filtres.
+- Analyse d’offre et génération assistée de lettre, à partir des données validées par l’utilisateur.
+
+Les pages d’édition, les documents et les données de candidature nécessitent une authentification et ne sont pas destinés à l’indexation.

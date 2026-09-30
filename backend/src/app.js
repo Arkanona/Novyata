@@ -31,7 +31,6 @@ app.get('/api/health', (req, res) => res.json({
   databaseConfigured: Boolean(process.env.DATABASE_URL),
   jwtConfigured: Boolean(process.env.JWT_SECRET),
 }))
-app.get('/api/applications', (req, res) => res.json({ applications: [] }))
 app.use('/api/v1/applications', applicationsRouter)
 app.use('/api/v1/auth', authRouter)
 app.use('/api/v1/cover-letters', coverLettersRouter)

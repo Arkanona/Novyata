@@ -23,10 +23,10 @@ describe('API routes', () => {
     expect(response.body.error.message).toBe('Authentification requise.')
   })
 
-  it('keeps the applications placeholder contract stable', async () => {
+  it('does not expose the removed applications placeholder endpoint', async () => {
     const response = await request(app).get('/api/applications')
-    expect(response.status).toBe(200)
-    expect(response.body).toEqual({ applications: [] })
+    expect(response.status).toBe(404)
+    expect(response.body.error.message).toBe('Route introuvable.')
   })
 
   it('accepts Vite development origins on ports 5173 and 5174', async () => {

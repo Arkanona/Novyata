@@ -12,3 +12,15 @@ export async function analyzeJobOffer(payload) {
   }
   return data
 }
+
+async function request(path, options = {}) {
+  const token = localStorage.getItem(TOKEN_KEY)
+  const response = await fetch(API_URL + path, { headers: { Authorization: token ? 'Bearer ' + token : '', ...options.headers }, ...options })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(data.error?.message || 'Une erreur est survenue.')
+  return data
+}
+
+export const getJobAnalyses = () => request('/api/v1/job-analyses')
+export const getJobAnalysis = (id) => request('/api/v1/job-analyses/' + id)
+export const deleteJobAnalysis = (id) => request('/api/v1/job-analyses/' + id, { method: 'DELETE' })

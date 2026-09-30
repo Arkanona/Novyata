@@ -56,6 +56,8 @@ Dans le SQL Editor de Supabase, exécutez [database/schema.sql](./database/schem
 | --- | --- |
 | `PORT` | Port de l’API, `3001` par défaut. |
 | `DATABASE_URL` | Chaîne de connexion PostgreSQL fournie par Supabase. |
+| `DATABASE_SSL` | `false` pour PostgreSQL local ; `true` pour Supabase ou un fournisseur imposant TLS. |
+| `DATABASE_SSL_REJECT_UNAUTHORIZED` | Vérification du certificat TLS, à laisser à `true` en production. |
 | `JWT_SECRET` | Secret JWT long, aléatoire et privé. |
 | `JWT_EXPIRES_IN` | Durée de validité du jeton, par exemple `7d`. |
 | `CORS_ORIGIN` | URL du frontend, par exemple `http://localhost:5173`. |

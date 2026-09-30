@@ -12,6 +12,7 @@ export async function mockApi(page) {
     resume: { id_resume: ids.resume, title_resume: 'CV E2E', first_name: 'Élise', last_name: 'Durand', email: user.email, phone: '0600000000', city: 'Paris', job_title: 'Product Designer', summary: 'Profil de test.', template_key: 'classic', accent_color: '#314A67', font_size: 'normal', experiences: [], educations: [], skills: [], languages: [], created_at: user.created_at, updated_at: user.created_at },
     letter: { id_cover_letter: ids.letter, id_resume: ids.resume, title: 'Lettre E2E', company_name: 'Novyata', job_title: 'Product Designer', recipient_name: '', recipient_position: '', company_address: '', subject: 'Candidature', content: 'Madame, Monsieur, je souhaite vous proposer ma candidature pour ce poste.', template: 'classic', created_at: user.created_at, updated_at: user.created_at },
     applications: [],
+    jobAnalysis: { id_job_analysis: 'bb8dc2f2-6ff2-43d2-9e4f-5443200f6d4b', id_resume: ids.resume, title_resume: 'CV E2E', company_name: 'Novyata', job_title: 'Product Designer', job_description: 'Nous recherchons un Product Designer maîtrisant Figma.', match_score: 82, analysis: { id_job_analysis: 'bb8dc2f2-6ff2-43d2-9e4f-5443200f6d4b', matchScore: 82, requirements: [{ name: 'Figma', category: 'essential' }, { name: 'Recherche utilisateur', category: 'secondary' }, { name: 'Jira', category: 'bonus' }], strongMatches: [{ name: 'Figma', evidence: 'Figma', reason: 'Compétence citée dans le CV.' }], partialMatches: [{ name: 'Recherche utilisateur', evidence: 'Profil de test.', reason: 'Le contexte de pratique reste à détailler.' }], importantMissingSkills: [], optionalMissingSkills: [{ name: 'Jira', reason: 'Jira est apprécié mais absent du CV.' }], importantKeywords: ['Produit'], suggestions: ['Décrivez un projet où vous avez utilisé Figma.'], scoreExplanation: 'Les exigences essentielles ont le poids le plus élevé.', safetyNote: 'N’ajoutez une compétence à votre CV que si vous la maîtrisez réellement.' }, created_at: user.created_at, updated_at: user.created_at },
   }
   const json = (route, value, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(value) })
   const body = (request) => { try { return JSON.parse(request.postData() || '{}') } catch { return {} } }
@@ -39,7 +40,11 @@ export async function mockApi(page) {
     if (path === `/api/v1/applications/${ids.application}` && method === 'GET') return json(route, { application: state.applications[0] })
     if (path === `/api/v1/applications/${ids.application}` && method === 'PATCH') { state.applications[0] = { ...state.applications[0], ...payload }; return json(route, { application: state.applications[0] }) }
     if (path === `/api/v1/applications/${ids.application}` && method === 'DELETE') return route.fulfill({ status: 204 })
-    if (path === '/api/v1/job-analysis') return json(route, { analysis: { matchScore: 82, matchedSkills: ['Figma'], skillsToStrengthen: [{ skill: 'Figma', detail: 'Ajoutez un exemple de projet.' }], missingSkills: [{ skill: 'Jira', message: 'Jira non mentionné — à mentionner uniquement si vous maîtrisez cette compétence.' }], importantKeywords: ['Produit'], suggestions: ['Mettez en avant vos projets produit.'] } })
+    if (path === '/api/v1/job-analysis') return json(route, { analysis: state.jobAnalysis.analysis }, 201)
+    if (path === '/api/v1/job-analyses' && method === 'GET') return json(route, { job_analyses: [state.jobAnalysis] })
+    if (path === `/api/v1/job-analyses/${state.jobAnalysis.id_job_analysis}` && method === 'GET') return json(route, { job_analysis: state.jobAnalysis })
+    if (path === `/api/v1/job-analyses/${state.jobAnalysis.id_job_analysis}` && method === 'DELETE') return route.fulfill({ status: 204 })
+    if (path === '/api/v1/cover-letter-generation') return json(route, { generation: { subject: 'Candidature Product Designer', content: 'Madame, Monsieur, je souhaite vous proposer ma candidature pour le poste de Product Designer.' } })
     return json(route, { error: { message: `Route E2E non mockée : ${method} ${path}` } }, 500)
   })
   return state

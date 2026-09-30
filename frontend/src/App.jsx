@@ -13,6 +13,8 @@ const CoverLetterEditorPage = lazy(() => import('./pages/CoverLetterEditorPage')
 const CoverLetterListPage = lazy(() => import('./pages/CoverLetterListPage'))
 const DashboardPage = lazy(() => import('./pages/DashboardPage'))
 const JobAnalysisPage = lazy(() => import('./pages/JobAnalysisPage'))
+const JobAnalysisDetailPage = lazy(() => import('./pages/JobAnalysisDetailPage'))
+const JobAnalysisListPage = lazy(() => import('./pages/JobAnalysisListPage'))
 const ResumeEditorPage = lazy(() => import('./pages/ResumeEditorPage'))
 const ResumeListPage = lazy(() => import('./pages/ResumeListPage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
@@ -42,6 +44,8 @@ export default function App() {
       <Route path="/candidatures/nouvelle" element={lazyPage(ApplicationEditorPage, { isNew: true })} />
       <Route path="/candidatures/:id" element={lazyPage(ApplicationEditorPage)} />
       <Route path="/analyse-offre" element={lazyPage(JobAnalysisPage)} />
+      <Route path="/analyses" element={lazyPage(JobAnalysisListPage)} />
+      <Route path="/analyses/:id" element={lazyPage(JobAnalysisDetailPage)} />
       <Route path="/parametres" element={lazyPage(SettingsPage)} />
     </Route></Route>
     <Route path="*" element={<NotFoundPage />} />

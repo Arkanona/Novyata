@@ -2,7 +2,7 @@ import ApiError from '../utils/ApiError.js'
 
 const openAiTimeout = () => {
   const value = Number.parseInt(process.env.OPENAI_TIMEOUT_MS, 10)
-  return Number.isFinite(value) && value > 0 ? value : 15_000
+  return Number.isFinite(value) && value > 0 ? value : 60_000
 }
 
 const generationSchema = {
@@ -29,7 +29,7 @@ export function validateCoverLetterGeneration(value) {
   return { subject, content }
 }
 
-export async function generateCoverLetter({ resume, jobDescription, companyName, jobTitle }) {
+export async function generateCoverLetter({ resume, jobDescription, companyName, jobTitle, analysis }) {
   if (!process.env.OPENAI_API_KEY) throw new ApiError(503, 'Le service de génération IA n’est pas configuré.')
 
   let response
@@ -39,9 +39,10 @@ export async function generateCoverLetter({ resume, jobDescription, companyName,
       headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(openAiTimeout()),
       body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-        instructions: 'Tu rédiges une lettre de motivation en français, professionnelle, naturelle et crédible. Utilise uniquement les éléments factuels du CV fourni et les informations de l’offre. N’invente jamais une expérience, un diplôme, une compétence, une responsabilité ou un résultat. Si une information manque, ne la suppose pas. Personnalise la lettre pour l’offre et mets en avant uniquement les compétences réellement présentes dans le CV. Réponds uniquement selon le schéma JSON demandé.',
-        input: `CV structuré :\n${JSON.stringify(resume)}\n\nOffre d’emploi :\n${jobDescription}\n\nEntreprise indiquée : ${companyName || 'Non précisée'}\nPoste visé indiqué : ${jobTitle || resume.job_title || 'Non précisé'}`,
+        model: process.env.OPENAI_MODEL || 'gpt-6-luna',
+        reasoning: { effort: 'low' },
+        instructions: 'Tu rédiges une lettre de motivation en français, professionnelle, naturelle et crédible. Utilise uniquement les éléments factuels du CV fourni et les informations de l’offre. N’invente jamais une expérience, un diplôme, une compétence, une responsabilité ou un résultat. Si une information manque, ne la suppose pas. Le contexte d’analyse sert uniquement à cibler la lettre : il ne constitue jamais une preuve d’expérience ou de compétence. Personnalise la lettre pour l’offre et mets en avant uniquement les compétences réellement présentes dans le CV. Réponds uniquement selon le schéma JSON demandé.',
+        input: `CV structuré (seule source des faits sur le candidat) :\n${JSON.stringify(resume)}\n\nOffre d’emploi :\n${jobDescription}\n\nContexte de l’analyse de l’offre (à utiliser pour le ciblage, pas comme faits sur le candidat) :\n${JSON.stringify(analysis || {})}\n\nEntreprise indiquée : ${companyName || 'Non précisée'}\nPoste visé indiqué : ${jobTitle || resume.job_title || 'Non précisé'}`,
         text: { format: { type: 'json_schema', name: 'cover_letter_generation', strict: true, schema: generationSchema } },
       }),
     })

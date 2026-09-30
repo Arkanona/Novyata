@@ -1,0 +1,14 @@
+import { useEffect, useState } from 'react'
+import { BarChart3, Search, Trash2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { deleteJobAnalysis, getJobAnalyses } from '../services/jobAnalysisService'
+
+function formatDate(date) { return date ? new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(date)) : '' }
+
+export default function JobAnalysisListPage() {
+  const [analyses, setAnalyses] = useState([]); const [search, setSearch] = useState(''); const [error, setError] = useState(''); const [loading, setLoading] = useState(true)
+  useEffect(() => { getJobAnalyses().then(({ job_analyses }) => setAnalyses(job_analyses)).catch((requestError) => setError(requestError.message)).finally(() => setLoading(false)) }, [])
+  async function remove(item) { if (!window.confirm('Supprimer cette analyse ?')) return; try { await deleteJobAnalysis(item.id_job_analysis); setAnalyses((current) => current.filter((analysis) => analysis.id_job_analysis !== item.id_job_analysis)) } catch (requestError) { setError(requestError.message) } }
+  const visible = analyses.filter((item) => [item.company_name, item.job_title, item.title_resume].some((value) => value?.toLowerCase().includes(search.trim().toLowerCase())))
+  return <main className="app-page job-analysis-list-page"><header className="app-header"><div><p className="crumb">Vos candidatures</p><h1>Mes analyses</h1></div><Link className="button" to="/analyse-offre">Analyser une offre</Link></header>{loading && <p className="dashboard-feedback">Chargement de vos analyses…</p>}{error && <p className="dashboard-feedback dashboard-feedback--error" role="alert">{error}</p>}{!loading && !error && analyses.length === 0 && <section className="analyses-empty"><BarChart3 size={28} /><h2>Aucune analyse enregistrée.</h2><p>Analysez une offre pour retrouver ici ses recommandations.</p><Link className="button" to="/analyse-offre">Analyser une offre</Link></section>}{!loading && analyses.length > 0 && <><label className="analysis-search"><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher une entreprise, un poste ou un CV" /></label><section className="analysis-history" aria-label="Historique des analyses">{visible.map((item) => <article key={item.id_job_analysis}><div><b>{item.company_name || 'Entreprise non renseignée'}</b><strong>{item.job_title || 'Poste non renseigné'}</strong><small>{item.title_resume} · {formatDate(item.updated_at)}</small></div><span>{item.match_score}%</span><Link to={'/analyses/' + item.id_job_analysis}>Voir</Link><button type="button" aria-label={'Supprimer l’analyse ' + (item.company_name || item.job_title)} onClick={() => remove(item)}><Trash2 size={16} /></button></article>)}{visible.length === 0 && <p className="analysis-empty">Aucune analyse ne correspond à votre recherche.</p>}</section></>}</main>
+}

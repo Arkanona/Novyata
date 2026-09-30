@@ -70,6 +70,19 @@ create table if not exists applications (
   constraint applications_status_check check (status in ('À postuler', 'Candidature envoyée', 'En cours d’étude', 'Entretien', 'Proposition', 'Refusée', 'Archivée'))
 );
 
+create table if not exists job_analyses (
+  id_job_analysis uuid primary key default gen_random_uuid(),
+  id_user uuid not null references users(id_user) on delete cascade,
+  id_resume uuid not null references resumes(id_resume) on delete cascade,
+  company_name varchar(160),
+  job_title varchar(160),
+  job_description text not null,
+  match_score integer not null check (match_score between 0 and 100),
+  analysis_result jsonb not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists experiences (
   id_experience uuid primary key default gen_random_uuid(),
   id_resume uuid not null references resumes(id_resume) on delete cascade,
@@ -190,6 +203,8 @@ create index if not exists cover_letters_user_id_idx on cover_letters(id_user);
 create index if not exists cover_letters_resume_id_idx on cover_letters(id_resume);
 create index if not exists applications_user_id_idx on applications(id_user);
 create index if not exists applications_status_idx on applications(status);
+create index if not exists job_analyses_user_id_idx on job_analyses(id_user);
+create index if not exists job_analyses_resume_id_idx on job_analyses(id_resume);
 create index if not exists experiences_resume_id_idx on experiences(id_resume);
 create index if not exists educations_resume_id_idx on educations(id_resume);
 create index if not exists skills_resume_id_idx on skills(id_resume);
@@ -217,6 +232,9 @@ create trigger cover_letters_set_updated_at before update on cover_letters for e
 
 drop trigger if exists applications_set_updated_at on applications;
 create trigger applications_set_updated_at before update on applications for each row execute function set_updated_at();
+
+drop trigger if exists job_analyses_set_updated_at on job_analyses;
+create trigger job_analyses_set_updated_at before update on job_analyses for each row execute function set_updated_at();
 
 drop trigger if exists experiences_set_updated_at on experiences;
 create trigger experiences_set_updated_at before update on experiences for each row execute function set_updated_at();

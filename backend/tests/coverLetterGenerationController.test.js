@@ -12,7 +12,7 @@ import ApiError from '../src/utils/ApiError.js'
 const userId = '8b74e3e1-64b4-46f1-bfd8-c50a174cf908'
 const otherUserId = '3f6070dc-e2c2-48e0-9089-a07155fbec2f'
 const resumeId = 'f8c5d2f2-6ff2-43d2-9e4f-5443200f6d4b'
-const body = { resumeId, jobDescription: 'Nous recherchons un Product Designer maîtrisant Figma, la recherche utilisateur et les tests.', companyName: 'Novyata', jobTitle: 'Product Designer' }
+const body = { resumeId, jobDescription: 'Nous recherchons un Product Designer maîtrisant Figma, la recherche utilisateur et les tests.', companyName: 'Novyata', jobTitle: 'Product Designer', analysis: { matchedSkills: ['Figma'], importantKeywords: ['Recherche utilisateur'], suggestions: ['Illustrez vos projets.'] } }
 const validGeneration = { subject: 'Candidature au poste de Product Designer', content: 'Madame, Monsieur, je vous adresse ma candidature pour le poste de Product Designer.' }
 
 describe('coverLetterGenerationController', () => {
@@ -57,9 +57,21 @@ describe('coverLetterGenerationController', () => {
     generateCoverLetter.mockResolvedValue(validGeneration)
     const res = createResponse()
     await createGeneratedCoverLetter({ auth: { sub: userId }, body }, res, vi.fn())
-    expect(generateCoverLetter).toHaveBeenCalledWith(expect.objectContaining({ jobDescription: body.jobDescription, companyName: 'Novyata', jobTitle: 'Product Designer', resume: expect.objectContaining({ id_resume: resumeId }) }))
+    expect(generateCoverLetter).toHaveBeenCalledWith(expect.objectContaining({ jobDescription: body.jobDescription, companyName: 'Novyata', jobTitle: 'Product Designer', analysis: body.analysis, resume: expect.objectContaining({ id_resume: resumeId }) }))
     expect(res.json).toHaveBeenCalledWith({ generation: validGeneration })
     expect(database.query.mock.calls).toHaveLength(5)
     expect(database.query.mock.calls.every(([sql]) => !/insert|update|delete/i.test(sql))).toBe(true)
+  })
+
+  it('does not alter the AI draft or add facts before returning it', async () => {
+    const database = { query: vi.fn().mockResolvedValueOnce({ rows: [{ id_resume: resumeId, title_resume: 'CV', skills: undefined }] }).mockResolvedValue({ rows: [] }) }
+    requireDatabase.mockReturnValue(database)
+    const draft = { subject: 'Candidature', content: 'Madame, Monsieur, voici un texte généré sans ajout automatique de données.' }
+    generateCoverLetter.mockResolvedValue(draft)
+    const res = createResponse()
+
+    await createGeneratedCoverLetter({ auth: { sub: userId }, body }, res, vi.fn())
+
+    expect(res.json).toHaveBeenCalledWith({ generation: draft })
   })
 })

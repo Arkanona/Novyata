@@ -63,6 +63,7 @@ Dans le SQL Editor de Supabase, exécutez [database/schema.sql](./database/schem
 | `CORS_ORIGIN` | URL du frontend, par exemple `http://localhost:5173`. |
 | `OPENAI_API_KEY` | Clé privée utilisée uniquement par les services IA backend. |
 | `OPENAI_MODEL` | Modèle OpenAI à utiliser, par exemple `gpt-4o-mini`. |
+| `OPENAI_MAX_OUTPUT_TOKENS` | Plafond de génération pour une analyse, `2400` par défaut. |
 
 Ne placez jamais une clé OpenAI dans le frontend ni dans le dépôt.
 

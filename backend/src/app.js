@@ -6,6 +6,7 @@ import applicationsRouter from './routes/applications.js'
 import authRouter from './routes/auth.js'
 import coverLettersRouter from './routes/coverLetters.js'
 import coverLetterGenerationRouter from './routes/coverLetterGeneration.js'
+import cvAdaptationRouter from './routes/cvAdaptation.js'
 import jobAnalysisRouter from './routes/jobAnalysis.js'
 import jobAnalysesRouter from './routes/jobAnalyses.js'
 import resumesRouter from './routes/resumes.js'
@@ -62,6 +63,7 @@ app.use('/api/v1/cover-letters', coverLettersRouter)
 app.use('/api/v1/cover-letter-generation', aiLimiter, coverLetterGenerationRouter)
 app.use('/api/v1/job-analysis', aiLimiter, jobAnalysisRouter)
 app.use('/api/v1/job-analyses', jobAnalysesRouter)
+app.use('/api/v1/job-analyses/:id/cv-adaptation', aiLimiter, cvAdaptationRouter)
 app.use('/api/v1/resumes', resumesRouter)
 app.use(notFound)
 app.use(errorHandler)

@@ -1,88 +1,153 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { analyzeJobDescription, validateAnalysis } from '../src/services/jobAnalysisService.js'
+import { analysisLimits, analyzeJobDescription, buildAnalysisSources, buildCompactResume, validateAnalysis } from '../src/services/jobAnalysisService.js'
 
 const resume = {
-  summary: 'Développement de composants React réutilisables et réalisation de tests fonctionnels.',
-  skills: [{ name: 'React' }, { name: 'Figma' }],
-  experiences: [{ description: 'Intégration de bases PostgreSQL dans une application web.' }],
+  job_title: 'Data Analyst Junior',
+  summary: 'Analyse de données et création de tableaux de bord.',
+  experiences: [{ job_title: 'Stagiaire BI', company: 'DataBridge', description: 'Création de requêtes SQL pour produire des indicateurs métier.' }],
+  skills: [{ name: 'SQL', level: 'Avancé' }, { name: 'Power BI', level: 'Avancé' }],
+  languages: [{ name: 'Français', level: 'Langue maternelle' }, { name: 'Anglais', level: 'Intermédiaire' }],
 }
-const empty = { importantKeywords: [], suggestions: ['Préciser une réalisation pertinente.'], scoreExplanation: 'Les exigences essentielles ont le poids le plus élevé.' }
+
+const empty = { importantKeywords: [], suggestions: ['Préciser un projet pertinent.'], scoreExplanation: 'Les exigences essentielles pèsent le plus.' }
+const sourcesFor = (currentResume = resume) => buildAnalysisSources(buildCompactResume(currentResume))
+
+function analysis(overrides = {}) {
+  return {
+    ...empty,
+    matchScore: 100,
+    requirements: [{ id: 'req_1', name: 'Analyse de données', importance: 'essential' }],
+    strongMatches: [{ requirementId: 'req_1', sourceId: 'src_job_title', reason: 'Poste cible pertinent.' }],
+    partialMatches: [], importantMissingSkills: [], optionalMissingSkills: [],
+    ...overrides,
+  }
+}
 
 describe('jobAnalysisService', () => {
   afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals() })
 
-  it('sends a structured OpenAI request and returns a weighted validated analysis', async () => {
+  it('generates stable, backend-owned CV sources including language level', () => {
+    expect(sourcesFor()).toEqual(expect.arrayContaining([
+      { id: 'src_job_title', text: 'Data Analyst Junior' },
+      { id: 'src_skill_1', text: 'SQL — Avancé' },
+      { id: 'src_language_2', text: 'Anglais — Intermédiaire' },
+      { id: 'src_exp_1_description', text: 'Création de requêtes SQL pour produire des indicateurs métier.' },
+    ]))
+  })
+
+  it('sends source IDs to OpenAI and reconstructs evidence on the backend', async () => {
     vi.stubEnv('OPENAI_API_KEY', 'test-key')
-    const rawAnalysis = {
-      ...empty,
-      matchScore: 99,
-      requirements: [{ name: 'React', category: 'essential' }],
-      strongMatches: [{ name: 'React', evidence: 'Développement de composants React réutilisables', reason: 'La compétence est démontrée dans le résumé.' }],
-      partialMatches: [], importantMissingSkills: [], optionalMissingSkills: [], importantKeywords: ['Produit'],
-    }
+    const rawAnalysis = analysis({ strongMatches: [{ requirementId: 'req_1', sourceId: 'src_language_2', reason: 'Niveau indiqué dans le CV.' }] })
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ output_text: JSON.stringify(rawAnalysis) }) })
     vi.stubGlobal('fetch', fetchMock)
-    await expect(analyzeJobDescription({ resume, jobDescription: 'Offre React' })).resolves.toMatchObject({ matchScore: 100, strongMatches: rawAnalysis.strongMatches })
+
+    await expect(analyzeJobDescription({ resume, jobDescription: 'InsightFlow recherche un Data Analyst avec un anglais intermédiaire.' })).resolves.toMatchObject({
+      strongMatches: [{ requirementId: 'req_1', sourceId: 'src_language_2', evidence: 'Anglais — Intermédiaire' }],
+    })
+
     const request = JSON.parse(fetchMock.mock.calls[0][1].body)
-    expect(request.text.format).toMatchObject({ type: 'json_schema', name: 'job_analysis', strict: true })
+    const sources = JSON.parse(request.input.split('\nOffre:\n')[0].replace('Sources CV:\n', ''))
+    expect(sources).toContainEqual({ id: 'src_language_2', text: 'Anglais — Intermédiaire' })
+    const properties = request.text.format.schema.properties.strongMatches.items.properties
+    expect(properties).toEqual(expect.objectContaining({ sourceId: expect.objectContaining({ enum: expect.arrayContaining(['src_language_2']) }) }))
+    expect(properties).not.toHaveProperty('evidence')
+    expect(request.instructions).toContain('choisis uniquement un sourceId fourni')
     expect(request.reasoning).toEqual({ effort: 'low' })
-    expect(request.text.format.schema.required).toContain('strongMatches')
+    expect(request.max_output_tokens).toBe(1650)
   })
 
-  it('classifies functional tests as a partial match for unit and integration tests', () => {
-    const analysis = validateAnalysis({
-      ...empty, matchScore: 100,
-      requirements: [{ name: 'Tests unitaires et d’intégration', category: 'essential' }],
-      strongMatches: [],
-      partialMatches: [{ name: 'Tests unitaires et d’intégration', evidence: 'réalisation de tests fonctionnels', reason: 'Les tests fonctionnels sont proches mais ne couvrent pas explicitement les tests unitaires et d’intégration.' }],
-      importantMissingSkills: [], optionalMissingSkills: [],
-    }, resume)
-
-    expect(analysis.partialMatches).toHaveLength(1)
-    expect(analysis.strongMatches).toHaveLength(0)
-    expect(analysis.matchScore).toBe(50)
-  })
-
-  it('keeps an OpenAI request error safe for the frontend', async () => {
+  it('does not send contact, visual, technical or timestamp data to OpenAI', async () => {
     vi.stubEnv('OPENAI_API_KEY', 'test-key')
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 400, json: async () => ({ error: { type: 'invalid_request_error', code: 'invalid_json_schema', message: 'Schema invalid.', param: 'text.format.schema' } }) }))
+    const verboseResume = { ...resume, id_resume: 'technical-id', first_name: 'Camille', email: 'camille@example.test', phone: '0600000000', city: 'Lyon', template_key: 'modern', accent_color: '#314A67', font_size: 'large', created_at: '2026-01-01' }
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ output_text: JSON.stringify(analysis()) }) })
+    vi.stubGlobal('fetch', fetchMock)
 
-    await expect(analyzeJobDescription({ resume, jobDescription: 'Offre React' })).rejects.toMatchObject({ statusCode: 502, message: 'La requête d’analyse est invalide. Réessayez dans quelques instants.' })
+    await analyzeJobDescription({ resume: verboseResume, jobDescription: 'Offre Data Analyst' })
+    const input = JSON.stringify(JSON.parse(fetchMock.mock.calls[0][1].body).input)
+    expect(input).not.toMatch(/camille@example|technical-id|0600000000|#314A67|2026-01-01/)
   })
 
-  it('separates a missing mandatory requirement from a missing bonus', () => {
-    const analysis = validateAnalysis({
-      ...empty, matchScore: 50,
-      requirements: [{ name: 'PostgreSQL avancé', category: 'essential' }, { name: 'Docker', category: 'bonus' }],
-      strongMatches: [], partialMatches: [],
-      importantMissingSkills: [{ name: 'PostgreSQL avancé', reason: 'Le CV mentionne PostgreSQL sans niveau avancé prouvé.' }],
-      optionalMissingSkills: [{ name: 'Docker', reason: 'Docker n’apparaît pas dans le CV.' }],
-    }, resume)
+  it('validates a valid sourceId and returns canonical requirement and evidence text', () => {
+    const result = validateAnalysis(analysis({
+      requirements: [{ id: 'req_1', name: 'Anglais professionnel', importance: 'essential' }],
+      strongMatches: [{ requirementId: 'req_1', sourceId: 'src_language_2', reason: 'Niveau renseigné.' }],
+    }), sourcesFor())
 
-    expect(analysis.importantMissingSkills.map((item) => item.name)).toEqual(['PostgreSQL avancé'])
-    expect(analysis.optionalMissingSkills.map((item) => item.name)).toEqual(['Docker'])
-    expect(analysis.matchScore).toBe(0)
+    expect(result.strongMatches).toEqual([{ requirementId: 'req_1', name: 'Anglais professionnel', sourceId: 'src_language_2', evidence: 'Anglais — Intermédiaire', reason: 'Niveau renseigné.' }])
+    expect(result.matchScore).toBe(100)
   })
 
-  it('weights essential requirements more heavily than secondary requirements and bonuses', () => {
-    const analysis = validateAnalysis({
-      ...empty, matchScore: 100,
-      requirements: [{ name: 'React', category: 'essential' }, { name: 'PostgreSQL', category: 'secondary' }, { name: 'Figma', category: 'bonus' }, { name: 'Coordonner les équipes', category: 'mission' }],
-      strongMatches: [{ name: 'React', evidence: 'Développement de composants React réutilisables', reason: 'Preuve directe.' }, { name: 'Figma', evidence: 'Figma', reason: 'Compétence présente.' }],
-      partialMatches: [],
-      importantMissingSkills: [{ name: 'PostgreSQL', reason: 'La preuve disponible ne détaille pas suffisamment la compétence demandée.' }],
-      optionalMissingSkills: [],
-    }, resume)
+  it('accepts a partial match through its sourceId', () => {
+    const result = validateAnalysis(analysis({
+      requirements: [{ id: 'req_1', name: 'SQL avancé', importance: 'essential' }], strongMatches: [],
+      partialMatches: [{ requirementId: 'req_1', sourceId: 'src_skill_1', reason: 'Niveau déclaré à préciser.' }],
+    }), sourcesFor())
 
-    expect(analysis.matchScore).toBe(73)
+    expect(result.partialMatches).toEqual([expect.objectContaining({ sourceId: 'src_skill_1', evidence: 'SQL — Avancé' })])
+    expect(result.matchScore).toBe(50)
   })
 
-  it('rejects an invented evidence or an unclassified important requirement', () => {
-    expect(() => validateAnalysis({
-      ...empty, matchScore: 100,
-      requirements: [{ name: 'React', category: 'essential' }],
-      strongMatches: [{ name: 'React', evidence: 'Pilotage d’une équipe de 12 personnes', reason: 'Preuve inventée.' }],
-      partialMatches: [], importantMissingSkills: [], optionalMissingSkills: [],
-    }, resume)).toThrow('réponse invalide')
+  it('rejects a sourceId that is not generated from the authenticated user CV', () => {
+    expect(() => validateAnalysis(analysis({ strongMatches: [{ requirementId: 'req_1', sourceId: 'src_language_99', reason: 'Source externe.' }] }), sourcesFor())).toThrow('réponse invalide')
+  })
+
+  it('rejects a sourceId generated for another CV source set', () => {
+    const otherSources = sourcesFor({ ...resume, languages: [{ name: 'Allemand', level: 'B2' }] })
+    expect(otherSources).toContainEqual({ id: 'src_language_1', text: 'Allemand — B2' })
+    expect(() => validateAnalysis(analysis({ strongMatches: [{ requirementId: 'req_1', sourceId: 'src_other_cv_language_1', reason: 'Source externe.' }] }), sourcesFor())).toThrow('réponse invalide')
+  })
+
+  it('rejects an unknown requirementId and a mission requirement match', () => {
+    expect(() => validateAnalysis(analysis({ strongMatches: [{ requirementId: 'req_999', sourceId: 'src_skill_1', reason: 'Preuve directe.' }] }), sourcesFor())).toThrow('réponse invalide')
+    expect(() => validateAnalysis(analysis({ requirements: [{ id: 'req_1', name: 'Coordonner une équipe', importance: 'mission' }] }), sourcesFor())).toThrow('réponse invalide')
+  })
+
+  it('accepts a missing skill without a sourceId', () => {
+    const result = validateAnalysis(analysis({
+      matchScore: 0, requirements: [{ id: 'req_1', name: 'Python', importance: 'essential' }], strongMatches: [],
+      importantMissingSkills: [{ requirementId: 'req_1', reason: 'Non présent dans le CV.' }],
+    }), sourcesFor())
+
+    expect(result.importantMissingSkills).toEqual([{ requirementId: 'req_1', name: 'Python', reason: 'Non présent dans le CV.' }])
+  })
+
+  it('preserves weighted scoring with stable IDs', () => {
+    const result = validateAnalysis(analysis({
+      requirements: [{ id: 'req_1', name: 'SQL', importance: 'essential' }, { id: 'req_2', name: 'Power BI', importance: 'secondary' }, { id: 'req_3', name: 'Docker', importance: 'bonus' }],
+      strongMatches: [{ requirementId: 'req_1', sourceId: 'src_skill_1', reason: 'Compétence renseignée.' }],
+      partialMatches: [{ requirementId: 'req_2', sourceId: 'src_skill_2', reason: 'Compétence renseignée.' }],
+      importantMissingSkills: [], optionalMissingSkills: [{ requirementId: 'req_3', reason: 'Non présent.' }],
+    }), sourcesFor())
+
+    expect(result.matchScore).toBe(77)
+  })
+
+  it('truncates a structurally valid optional list exceeding the configured limit', () => {
+    const requirements = Array.from({ length: 6 }, (_, index) => ({ id: `req_${index + 1}`, name: `Bonus ${index + 1}`, importance: 'bonus' }))
+    const result = validateAnalysis(analysis({ matchScore: 0, requirements, strongMatches: [], partialMatches: [], importantMissingSkills: [], optionalMissingSkills: requirements.map((requirement) => ({ requirementId: requirement.id, reason: 'Non présent.' })) }), sourcesFor())
+    expect(result.optionalMissingSkills).toHaveLength(analysisLimits.optionalMissingSkills)
+  })
+
+  it('rejects an invalid score and malformed source object', () => {
+    expect(() => validateAnalysis(analysis({ matchScore: '100' }), sourcesFor())).toThrow('réponse invalide')
+    expect(() => validateAnalysis(analysis(), [{ id: 'src_skill_1' }])).toThrow('réponse invalide')
+  })
+
+  it('detects a max-output-token truncation before parsing the response', async () => {
+    vi.stubEnv('OPENAI_API_KEY', 'test-key'); vi.stubEnv('NODE_ENV', 'development')
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ status: 'incomplete', incomplete_details: { reason: 'max_output_tokens' }, output_text: '{"partial":', usage: { output_tokens: 1650 } }) }))
+    await expect(analyzeJobDescription({ resume, jobDescription: 'Offre Data Analyst' })).rejects.toMatchObject({ statusCode: 502 })
+    expect(consoleWarn).toHaveBeenCalledWith('OpenAI analysis truncated:', { outputTokens: 1650, maxOutputTokens: 1650, reason: 'max_output_tokens' })
+    consoleWarn.mockRestore()
+  })
+
+  it('uses all configured Structured Output limits', async () => {
+    vi.stubEnv('OPENAI_API_KEY', 'test-key')
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ output_text: JSON.stringify(analysis()) }) })
+    vi.stubGlobal('fetch', fetchMock)
+    await analyzeJobDescription({ resume, jobDescription: 'Offre Data Analyst' })
+    const schema = JSON.parse(fetchMock.mock.calls[0][1].body).text.format.schema.properties
+    Object.entries(analysisLimits).forEach(([field, limit]) => expect(schema[field].maxItems).toBe(limit))
   })
 })

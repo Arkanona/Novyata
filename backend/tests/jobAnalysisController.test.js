@@ -72,4 +72,14 @@ describe('jobAnalysisController', () => {
     expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 502 })
     expect(database.query.mock.calls.some(([sql]) => /insert into job_analyses/i.test(sql))).toBe(false)
   })
+
+  it('does not save an analysis when OpenAI reports a truncated response', async () => {
+    const database = { query: vi.fn().mockResolvedValueOnce({ rows: [{ id_resume: resumeId, title_resume: 'CV' }] }).mockResolvedValue({ rows: [] }) }
+    requireDatabase.mockReturnValue(database)
+    analyzeJobDescription.mockRejectedValue(new ApiError(502, 'La génération de l’analyse a atteint sa limite. Réessayez dans quelques instants.'))
+    const next = vi.fn()
+    await analyzeJob({ auth: { sub: userId }, body }, createResponse(), next)
+    expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 502, message: 'La génération de l’analyse a atteint sa limite. Réessayez dans quelques instants.' })
+    expect(database.query.mock.calls.some(([sql]) => /insert into job_analyses/i.test(sql))).toBe(false)
+  })
 })

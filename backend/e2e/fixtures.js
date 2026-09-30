@@ -3,6 +3,7 @@ const ids = {
   resume: 'f8c5d2f2-6ff2-43d2-9e4f-5443200f6d4b',
   letter: 'fa8dc2f2-6ff2-43d2-9e4f-5443200f6d4b',
   application: 'aa8dc2f2-6ff2-43d2-9e4f-5443200f6d4b',
+  adaptedResume: 'cc8dc2f2-6ff2-43d2-9e4f-5443200f6d4b',
 }
 
 export const user = { id_user: ids.user, first_name: 'Élise', last_name: 'Durand', email: 'elise.e2e@example.test', created_at: '2026-01-01T00:00:00.000Z' }
@@ -12,6 +13,7 @@ export async function mockApi(page) {
     resume: { id_resume: ids.resume, title_resume: 'CV E2E', first_name: 'Élise', last_name: 'Durand', email: user.email, phone: '0600000000', city: 'Paris', job_title: 'Product Designer', summary: 'Profil de test.', template_key: 'classic', accent_color: '#314A67', font_size: 'normal', experiences: [], educations: [], skills: [], languages: [], created_at: user.created_at, updated_at: user.created_at },
     letter: { id_cover_letter: ids.letter, id_resume: ids.resume, title: 'Lettre E2E', company_name: 'Novyata', job_title: 'Product Designer', recipient_name: '', recipient_position: '', company_address: '', subject: 'Candidature', content: 'Madame, Monsieur, je souhaite vous proposer ma candidature pour ce poste.', template: 'classic', created_at: user.created_at, updated_at: user.created_at },
     applications: [],
+    adaptedResume: null,
     jobAnalysis: { id_job_analysis: 'bb8dc2f2-6ff2-43d2-9e4f-5443200f6d4b', id_resume: ids.resume, title_resume: 'CV E2E', company_name: 'Novyata', job_title: 'Product Designer', job_description: 'Nous recherchons un Product Designer maîtrisant Figma.', match_score: 82, analysis: { id_job_analysis: 'bb8dc2f2-6ff2-43d2-9e4f-5443200f6d4b', matchScore: 82, requirements: [{ name: 'Figma', category: 'essential' }, { name: 'Recherche utilisateur', category: 'secondary' }, { name: 'Jira', category: 'bonus' }], strongMatches: [{ name: 'Figma', evidence: 'Figma', reason: 'Compétence citée dans le CV.' }], partialMatches: [{ name: 'Recherche utilisateur', evidence: 'Profil de test.', reason: 'Le contexte de pratique reste à détailler.' }], importantMissingSkills: [], optionalMissingSkills: [{ name: 'Jira', reason: 'Jira est apprécié mais absent du CV.' }], importantKeywords: ['Produit'], suggestions: ['Décrivez un projet où vous avez utilisé Figma.'], scoreExplanation: 'Les exigences essentielles ont le poids le plus élevé.', safetyNote: 'N’ajoutez une compétence à votre CV que si vous la maîtrisez réellement.' }, created_at: user.created_at, updated_at: user.created_at },
   }
   const json = (route, value, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(value) })
@@ -24,6 +26,7 @@ export async function mockApi(page) {
     if (path === '/api/v1/resumes' && method === 'GET') return json(route, { resumes: [state.resume] })
     if (path === '/api/v1/resumes' && method === 'POST') { state.resume = { ...state.resume, ...payload, id_resume: ids.resume, experiences: [], educations: [], skills: [], languages: [] }; return json(route, { resume: state.resume }, 201) }
     if (path === `/api/v1/resumes/${ids.resume}` && method === 'GET') return json(route, { resume: state.resume })
+    if (path === `/api/v1/resumes/${ids.adaptedResume}` && method === 'GET') return json(route, { resume: state.adaptedResume || state.resume })
     if (path === `/api/v1/resumes/${ids.resume}` && method === 'PATCH') { state.resume = { ...state.resume, ...payload }; return json(route, { resume: state.resume }) }
     if (path === `/api/v1/resumes/${ids.resume}` && method === 'DELETE') return route.fulfill({ status: 204 })
     if (path.includes(`/api/v1/resumes/${ids.resume}/experiences`) && method === 'POST') { const experience = { id_experience: 'e1', ...payload }; state.resume.experiences.push(experience); return json(route, { experience }, 201) }
@@ -43,6 +46,8 @@ export async function mockApi(page) {
     if (path === '/api/v1/job-analysis') return json(route, { analysis: state.jobAnalysis.analysis }, 201)
     if (path === '/api/v1/job-analyses' && method === 'GET') return json(route, { job_analyses: [state.jobAnalysis] })
     if (path === `/api/v1/job-analyses/${state.jobAnalysis.id_job_analysis}` && method === 'GET') return json(route, { job_analysis: state.jobAnalysis })
+    if (path === `/api/v1/job-analyses/${state.jobAnalysis.id_job_analysis}/cv-adaptation` && method === 'POST') return json(route, { adaptation: { proposals: [{ id: 'summary-1', field: 'summary', targetIndex: 0, currentText: 'Profil de test.', proposedText: 'Product Designer spécialisé dans les parcours utilisateurs et Figma.', reason: 'Met en avant des éléments déjà présents.' }] } })
+    if (path === `/api/v1/job-analyses/${state.jobAnalysis.id_job_analysis}/cv-adaptation/apply` && method === 'POST') { state.adaptedResume = { ...state.resume, id_resume: ids.adaptedResume, title_resume: 'CV E2E — Novyata', summary: payload.acceptedIds?.includes('summary-1') ? 'Product Designer spécialisé dans les parcours utilisateurs et Figma.' : state.resume.summary }; return json(route, { resume: { id_resume: ids.adaptedResume, title_resume: state.adaptedResume.title_resume }, appliedCount: payload.acceptedIds?.length || 0 }, 201) }
     if (path === `/api/v1/job-analyses/${state.jobAnalysis.id_job_analysis}` && method === 'DELETE') return route.fulfill({ status: 204 })
     if (path === '/api/v1/cover-letter-generation') return json(route, { generation: { subject: 'Candidature Product Designer', content: 'Madame, Monsieur, je souhaite vous proposer ma candidature pour le poste de Product Designer.' } })
     return json(route, { error: { message: `Route E2E non mockée : ${method} ${path}` } }, 500)

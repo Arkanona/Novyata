@@ -23,7 +23,7 @@ describe('JobAnalysisPage', () => {
   it('lets the user edit and save the generated letter in cover letters', async () => {
     useAuth.mockReturnValue({ user: { first_name: 'Marie', last_name: 'Laurent' } })
     getResumes.mockResolvedValue({ resumes: [resume] })
-    analyzeJobOffer.mockResolvedValue({ analysis: { matchScore: 80, strongMatches: [{ name: 'Figma', evidence: 'Figma', reason: 'Compétence présente.' }], partialMatches: [], importantMissingSkills: [], optionalMissingSkills: [], importantKeywords: ['Produit'], suggestions: ['Mettez en avant vos projets produit.'], scoreExplanation: 'Les exigences essentielles sont majoritaires.' } })
+    analyzeJobOffer.mockResolvedValue({ analysis: { matchScore: 80, strongMatches: [{ name: 'Figma', sourceId: 'src_skill_1', evidence: 'Figma', reason: 'Compétence présente.' }], partialMatches: [], importantMissingSkills: [], optionalMissingSkills: [], importantKeywords: ['Produit'], suggestions: ['Mettez en avant vos projets produit.'], scoreExplanation: 'Les exigences essentielles sont majoritaires.' } })
     generateCoverLetter.mockResolvedValue({ generation: { subject: 'Candidature Product Designer', content: 'Madame, Monsieur, je souhaite vous proposer ma candidature pour ce poste de Product Designer.' } })
     createCoverLetter.mockResolvedValue({ cover_letter: { id_cover_letter: '8d11d6e9-5f59-4ed3-9c4c-cb7cc6cf8f67' } })
     render(<MemoryRouter><JobAnalysisPage /></MemoryRouter>)
@@ -40,7 +40,7 @@ describe('JobAnalysisPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer dans mes lettres' }))
 
     await waitFor(() => expect(createCoverLetter).toHaveBeenCalledWith(expect.objectContaining({ id_resume: resume.id_resume, company_name: 'Novyata', job_title: 'Product Designer', subject: 'Candidature Product Designer', content: 'Madame, Monsieur, cette version a été relue et personnalisée pour votre offre.' })))
-    expect(generateCoverLetter).toHaveBeenCalledWith(expect.objectContaining({ resumeId: resume.id_resume, companyName: 'Novyata', jobTitle: 'Product Designer', analysis: expect.objectContaining({ matchScore: 80, strongMatches: [{ name: 'Figma', evidence: 'Figma', reason: 'Compétence présente.' }] }) }))
+    expect(generateCoverLetter).toHaveBeenCalledWith(expect.objectContaining({ resumeId: resume.id_resume, companyName: 'Novyata', jobTitle: 'Product Designer', analysis: expect.objectContaining({ matchScore: 80, strongMatches: [{ name: 'Figma', sourceId: 'src_skill_1', evidence: 'Figma', reason: 'Compétence présente.' }] }) }))
   })
 
   it('distinguishes skills to clarify from skills that are not mentioned', async () => {

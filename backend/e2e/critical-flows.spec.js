@@ -101,3 +101,13 @@ test('analyse d’offre : résultat, génération puis sauvegarde de lettre mock
   await page.getByRole('button', { name: 'Enregistrer dans mes lettres' }).click()
   await expect(page).toHaveURL(/\/lettres\//)
 })
+
+test('analyse enregistrée : création contrôlée d’une copie adaptée du CV', async ({ page }) => {
+  const state = await authenticatedPage(page)
+  await page.goto('/analyses/' + state.jobAnalysis.id_job_analysis)
+  await page.getByRole('button', { name: 'Adapter mon CV à cette offre' }).click()
+  await expect(page.getByText('Product Designer spécialisé dans les parcours utilisateurs et Figma.')).toBeVisible()
+  await page.getByRole('button', { name: 'Accepter', exact: true }).click()
+  await page.getByRole('button', { name: /Créer mon CV adapté/ }).click()
+  await expect(page).toHaveURL(/\/cv\/cc8dc2f2-6ff2-43d2-9e4f-5443200f6d4b$/)
+})

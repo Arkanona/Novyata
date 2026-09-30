@@ -8,7 +8,7 @@ dotenv.config({ override: true })
 // has been configured, otherwise the pool can retain an outdated DATABASE_URL.
 const { default: app } = await import('./app.js')
 
-const port = process.env.PORT || 3000
+const port = process.env.PORT || 3001
 
 app.listen(port, () => {
   console.log(`Novyata API available on http://localhost:${port}`)

@@ -54,7 +54,7 @@ Dans le SQL Editor de Supabase, exécutez [database/schema.sql](./database/schem
 
 | Variable | Description |
 | --- | --- |
-| `PORT` | Port de l’API, `3000` par défaut. |
+| `PORT` | Port de l’API, `3001` par défaut. |
 | `DATABASE_URL` | Chaîne de connexion PostgreSQL fournie par Supabase. |
 | `JWT_SECRET` | Secret JWT long, aléatoire et privé. |
 | `JWT_EXPIRES_IN` | Durée de validité du jeton, par exemple `7d`. |
@@ -68,7 +68,7 @@ Ne placez jamais une clé OpenAI dans le frontend ni dans le dépôt.
 
 | Variable | Description |
 | --- | --- |
-| `VITE_API_URL` | URL publique de l’API, par exemple `http://localhost:3000`. |
+| `VITE_API_URL` | URL publique de l’API, par exemple `http://localhost:3001`. |
 
 ## Lancer le projet
 
@@ -86,7 +86,7 @@ cd frontend
 npm run dev
 ```
 
-L’API est servie sur `http://localhost:3000` et Vite sur `http://localhost:5173`.
+L’API est servie sur `http://localhost:3001` et Vite sur `http://localhost:5173`.
 
 ## Fonctionnalités disponibles
 
@@ -123,3 +123,13 @@ npm test
 # Build de production frontend
 npm run build
 ```
+
+## Préparation production
+
+- Utilisez des fichiers d’environnement distincts : `backend/.env` pour le développement, `backend/.env.test.example` comme référence pour un environnement de test isolé et `backend/.env.production.example` comme référence de production.
+- En production, renseignez une URL Supabase/PostgreSQL dédiée, un `JWT_SECRET` long et unique, une origine CORS HTTPS exacte et, si l’hébergeur utilise un proxy, `TRUST_PROXY=true`.
+- Construisez le frontend avec `cd frontend && npm run build`, puis servez le dossier `frontend/dist` avec une règle de réécriture SPA vers `index.html`.
+- Lancez l’API avec `cd backend && npm start` après avoir défini `NODE_ENV=production`.
+- Exécutez les tests unitaires avec `npm test` dans chaque application et les parcours Playwright isolés avec `cd backend && npm run test:e2e`.
+- Les tests E2E interceptent toutes les API métier : ils n’utilisent ni Supabase réel ni clé OpenAI et ne créent aucune donnée persistante.
+- Avant déploiement, exécutez `database/schema.sql` sur la base Supabase cible et configurez `OPENAI_API_KEY` uniquement si les fonctions IA doivent être activées.

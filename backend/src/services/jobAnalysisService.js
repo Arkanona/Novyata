@@ -1,5 +1,10 @@
 import ApiError from '../utils/ApiError.js'
 
+const openAiTimeout = () => {
+  const value = Number.parseInt(process.env.OPENAI_TIMEOUT_MS, 10)
+  return Number.isFinite(value) && value > 0 ? value : 15_000
+}
+
 const analysisSchema = {
   type: 'object',
   additionalProperties: false,
@@ -110,17 +115,24 @@ export function validateAnalysis(value) {
 
 export async function analyzeJobDescription({ resume, jobDescription }) {
   if (!process.env.OPENAI_API_KEY) throw new ApiError(503, 'Le service d’analyse IA n’est pas configuré.')
-  const response = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-      instructions: 'Tu analyses la correspondance entre un CV et une offre d’emploi. Réponds uniquement selon le schéma JSON demandé, en français, avec des suggestions concrètes et concises. Une compétence présente dans matchedSkills ne doit jamais figurer dans missingSkills. Lorsqu’une compétence est présente mais manque de précision, ajoute-la uniquement dans skillsToStrengthen avec une action concrète à détailler (niveau, contexte ou usage), sans la présenter comme absente. Chaque élément de missingSkills ne contient qu’une seule compétence, jamais une liste regroupée. missingSkills ne contient que des compétences absentes du CV : ne suggère jamais que la personne les ajoute ou les revendique. Dans suggestions, pour toute compétence absente, utilise une formulation conditionnelle du type « À mentionner uniquement si vous maîtrisez cette compétence. »',
-      input: `CV structuré :\n${JSON.stringify(resume)}\n\nOffre d’emploi :\n${jobDescription}`,
-      text: { format: { type: 'json_schema', name: 'job_analysis', strict: true, schema: analysisSchema } },
-    }),
-  })
-  if (!response.ok) throw new ApiError(502, 'Le service d’analyse est temporairement indisponible.')
+  let response
+  try {
+    response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(openAiTimeout()),
+      body: JSON.stringify({
+        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+        instructions: 'Tu analyses la correspondance entre un CV et une offre d’emploi. Réponds uniquement selon le schéma JSON demandé, en français, avec des suggestions concrètes et concises. Une compétence présente dans matchedSkills ne doit jamais figurer dans missingSkills. Lorsqu’une compétence est présente mais manque de précision, ajoute-la uniquement dans skillsToStrengthen avec une action concrète à détailler (niveau, contexte ou usage), sans la présenter comme absente. Chaque élément de missingSkills ne contient qu’une seule compétence, jamais une liste regroupée. missingSkills ne contient que des compétences absentes du CV : ne suggère jamais que la personne les ajoute ou les revendique. Dans suggestions, pour toute compétence absente, utilise une formulation conditionnelle du type « À mentionner uniquement si vous maîtrisez cette compétence. »',
+        input: `CV structuré :\n${JSON.stringify(resume)}\n\nOffre d’emploi :\n${jobDescription}`,
+        text: { format: { type: 'json_schema', name: 'job_analysis', strict: true, schema: analysisSchema } },
+      }),
+    })
+  } catch (error) {
+    if (error?.name === 'TimeoutError' || error?.name === 'AbortError') throw new ApiError(504, 'Le service d’analyse a expiré. Réessayez dans quelques instants.')
+    throw new ApiError(502, 'Le service d’analyse est temporairement indisponible.')
+  }
+  if (!response.ok) throw new ApiError(response.status === 429 ? 429 : 502, response.status === 429 ? 'Le quota d’analyse est temporairement atteint. Réessayez plus tard.' : 'Le service d’analyse est temporairement indisponible.')
   const data = await response.json()
   try { return validateAnalysis(JSON.parse(textFromResponse(data))) } catch (error) {
     if (error instanceof ApiError) throw error

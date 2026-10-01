@@ -46,12 +46,11 @@ describe('jobAnalysisService', () => {
     })
 
     const request = JSON.parse(fetchMock.mock.calls[0][1].body)
-    const sources = JSON.parse(request.input.split('\nOffre:\n')[0].replace('Sources CV:\n', ''))
-    expect(sources).toContainEqual({ id: 'src_language_2', text: 'Anglais — Intermédiaire' })
+    expect(request.input).toContain('src_language_2: Anglais — Intermédiaire')
     const properties = request.text.format.schema.properties.strongMatches.items.properties
     expect(properties).toEqual(expect.objectContaining({ sourceId: expect.objectContaining({ enum: expect.arrayContaining(['src_language_2']) }) }))
     expect(properties).not.toHaveProperty('evidence')
-    expect(request.instructions).toContain('choisis uniquement un sourceId fourni')
+    expect(request.instructions).toContain('utilise uniquement un sourceId fourni')
     expect(request.reasoning).toEqual({ effort: 'low' })
     expect(request.max_output_tokens).toBe(1650)
   })

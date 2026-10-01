@@ -1,136 +1,29 @@
 import bcrypt from 'bcrypt'
+import crypto from 'crypto'
 import jwt from 'jsonwebtoken'
 import { requireDatabase } from '../config/database.js'
+import { sendPasswordResetEmail, sendVerificationEmail } from '../services/emailService.js'
 import ApiError from '../utils/ApiError.js'
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex')
+const newToken = () => crypto.randomBytes(32).toString('hex')
+const expiry = (milliseconds) => new Date(Date.now() + milliseconds).toISOString()
+const userColumns = 'id_user, first_name, last_name, email, plan, subscription_status, stripe_customer_id, current_period_end, email_verified, created_at'
 
-function serializeUser(user) {
-  return {
-    id_user: user.id_user,
-    first_name: user.first_name,
-    last_name: user.last_name,
-    email: user.email,
-    created_at: user.created_at,
-  }
-}
+function serializeUser(user) { return { id_user: user.id_user, first_name: user.first_name, last_name: user.last_name, email: user.email, plan: user.plan || 'free', subscription_status: user.subscription_status || 'free', current_period_end: user.current_period_end || null, email_verified: Boolean(user.email_verified), created_at: user.created_at } }
+function createToken(user) { if (!process.env.JWT_SECRET) throw new ApiError(500, 'La configuration d’authentification est incomplète.'); return jwt.sign({ sub: user.id_user, email: user.email }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }) }
+function validateRegister(body) { const errors = {}; const firstName = body.first_name?.trim(); const lastName = body.last_name?.trim(); const email = body.email?.trim().toLowerCase(); const password = body.password; if (!firstName || firstName.length < 2) errors.first_name = 'Le prénom doit contenir au moins 2 caractères.'; if (!lastName || lastName.length < 2) errors.last_name = 'Le nom doit contenir au moins 2 caractères.'; if (!emailPattern.test(email || '')) errors.email = 'Adresse e-mail invalide.'; if (typeof password !== 'string' || password.length < 8) errors.password = 'Le mot de passe doit contenir au moins 8 caractères.'; if (Object.keys(errors).length) throw new ApiError(400, 'Certaines informations sont invalides.', errors); return { firstName, lastName, email, password } }
+function validateLogin(body) { const email = body.email?.trim().toLowerCase(); const password = body.password; const errors = {}; if (!emailPattern.test(email || '')) errors.email = 'Adresse e-mail invalide.'; if (typeof password !== 'string' || !password) errors.password = 'Mot de passe requis.'; if (Object.keys(errors).length) throw new ApiError(400, 'Certaines informations sont invalides.', errors); return { email, password } }
+async function issueVerification(database, user) { const token = newToken(); await database.query('update users set email_verification_token_hash = $1, email_verification_expires_at = $2, updated_at = now() where id_user = $3', [hashToken(token), expiry(86400000), user.id_user]); await sendVerificationEmail({ email: user.email, token }) }
 
-function createToken(user) {
-  if (!process.env.JWT_SECRET) throw new ApiError(500, 'La configuration d’authentification est incomplète.')
-  return jwt.sign(
-    { sub: user.id_user, email: user.email },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' },
-  )
-}
-
-function validateRegister(body) {
-  const errors = {}
-  const firstName = body.first_name?.trim()
-  const lastName = body.last_name?.trim()
-  const email = body.email?.trim().toLowerCase()
-  const password = body.password
-
-  if (!firstName || firstName.length < 2) errors.first_name = 'Le prénom doit contenir au moins 2 caractères.'
-  if (!lastName || lastName.length < 2) errors.last_name = 'Le nom doit contenir au moins 2 caractères.'
-  if (!emailPattern.test(email || '')) errors.email = 'Adresse e-mail invalide.'
-  if (typeof password !== 'string' || password.length < 8) errors.password = 'Le mot de passe doit contenir au moins 8 caractères.'
-  if (Object.keys(errors).length) throw new ApiError(400, 'Certaines informations sont invalides.', errors)
-
-  return { firstName, lastName, email, password }
-}
-
-function validateLogin(body) {
-  const errors = {}
-  const email = body.email?.trim().toLowerCase()
-  const password = body.password
-
-  if (!emailPattern.test(email || '')) errors.email = 'Adresse e-mail invalide.'
-  if (typeof password !== 'string' || !password) errors.password = 'Mot de passe requis.'
-  if (Object.keys(errors).length) throw new ApiError(400, 'Certaines informations sont invalides.', errors)
-
-  return { email, password }
-}
-
-export async function register(req, res, next) {
-  try {
-    const { firstName, lastName, email, password } = validateRegister(req.body)
-    const passwordHash = await bcrypt.hash(password, 12)
-    const result = await requireDatabase().query(
-      'insert into users (first_name, last_name, email, password) values ($1, $2, $3, $4) returning id_user, first_name, last_name, email, created_at',
-      [firstName, lastName, email, passwordHash],
-    )
-    const user = result.rows[0]
-    return res.status(201).json({ user: serializeUser(user), token: createToken(user) })
-  } catch (error) {
-    if (error.code === '23505') return next(new ApiError(409, 'Cette adresse e-mail est déjà utilisée.'))
-    return next(error)
-  }
-}
-
-export async function login(req, res, next) {
-  try {
-    const { email, password } = validateLogin(req.body)
-    const result = await requireDatabase().query(
-      'select id_user, first_name, last_name, email, password, created_at from users where email = $1',
-      [email],
-    )
-    const user = result.rows[0]
-
-    if (!user || !(await bcrypt.compare(password, user.password))) {
-      throw new ApiError(401, 'Adresse e-mail ou mot de passe incorrect.')
-    }
-
-    return res.json({ user: serializeUser(user), token: createToken(user) })
-  } catch (error) {
-    return next(error)
-  }
-}
-
-export async function me(req, res, next) {
-  try {
-    const result = await requireDatabase().query(
-      'select id_user, first_name, last_name, email, created_at from users where id_user = $1',
-      [req.auth.sub],
-    )
-    const user = result.rows[0]
-    if (!user) throw new ApiError(401, 'Utilisateur introuvable.')
-    return res.json({ user: serializeUser(user) })
-  } catch (error) {
-    return next(error)
-  }
-}
-
-export async function updateProfile(req, res, next) {
-  try {
-    const { firstName, lastName, email } = validateRegister({ ...req.body, password: 'temporary-password' })
-    const result = await requireDatabase().query('update users set first_name = $1, last_name = $2, email = $3, updated_at = now() where id_user = $4 returning id_user, first_name, last_name, email, created_at', [firstName, lastName, email, req.auth.sub])
-    if (!result.rows[0]) throw new ApiError(404, 'Utilisateur introuvable.')
-    return res.json({ user: serializeUser(result.rows[0]) })
-  } catch (error) { if (error.code === '23505') return next(new ApiError(409, 'Cette adresse e-mail est déjà utilisée.')); return next(error) }
-}
-
-export async function changePassword(req, res, next) {
-  try {
-    const { current_password: currentPassword, new_password: newPassword, confirmation } = req.body
-    const errors = {}
-    if (!currentPassword) errors.current_password = 'Mot de passe actuel requis.'
-    if (typeof newPassword !== 'string' || newPassword.length < 8) errors.new_password = 'Le nouveau mot de passe doit contenir au moins 8 caractères.'
-    if (newPassword !== confirmation) errors.confirmation = 'Les mots de passe ne correspondent pas.'
-    if (Object.keys(errors).length) throw new ApiError(400, 'Certaines informations sont invalides.', errors)
-    const database = requireDatabase(); const found = await database.query('select password from users where id_user = $1', [req.auth.sub])
-    if (!found.rows[0]) throw new ApiError(404, 'Utilisateur introuvable.')
-    if (!(await bcrypt.compare(currentPassword, found.rows[0].password))) throw new ApiError(400, 'Le mot de passe actuel est incorrect.', { current_password: 'Mot de passe actuel incorrect.' })
-    const hash = await bcrypt.hash(newPassword, 12)
-    await database.query('update users set password = $1, updated_at = now() where id_user = $2', [hash, req.auth.sub])
-    return res.status(204).send()
-  } catch (error) { return next(error) }
-}
-
-export async function deleteAccount(req, res, next) {
-  try {
-    const result = await requireDatabase().query('delete from users where id_user = $1 returning id_user', [req.auth.sub])
-    if (!result.rows[0]) throw new ApiError(404, 'Utilisateur introuvable.')
-    return res.status(204).send()
-  } catch (error) { return next(error) }
-}
+export async function register(req, res, next) { try { const { firstName, lastName, email, password } = validateRegister(req.body); const database = requireDatabase(); const result = await database.query(`insert into users (first_name, last_name, email, password) values ($1, $2, $3, $4) returning ${userColumns}`, [firstName, lastName, email, await bcrypt.hash(password, 12)]); const user = result.rows[0]; await issueVerification(database, user); return res.status(201).json({ user: serializeUser(user), token: createToken(user), verification_required: true }) } catch (error) { if (error.code === '23505') return next(new ApiError(409, 'Cette adresse e-mail est déjà utilisée.')); return next(error) } }
+export async function login(req, res, next) { try { const { email, password } = validateLogin(req.body); const result = await requireDatabase().query(`select ${userColumns}, password from users where email = $1`, [email]); const user = result.rows[0]; if (!user || !(await bcrypt.compare(password, user.password))) throw new ApiError(401, 'Adresse e-mail ou mot de passe incorrect.'); return res.json({ user: serializeUser(user), token: createToken(user) }) } catch (error) { return next(error) } }
+export async function me(req, res, next) { try { const result = await requireDatabase().query(`select ${userColumns} from users where id_user = $1`, [req.auth.sub]); if (!result.rows[0]) throw new ApiError(401, 'Utilisateur introuvable.'); return res.json({ user: serializeUser(result.rows[0]) }) } catch (error) { return next(error) } }
+export async function updateProfile(req, res, next) { try { const { firstName, lastName, email } = validateRegister({ ...req.body, password: 'temporary-password' }); const database = requireDatabase(); const result = await database.query(`update users set first_name = $1, last_name = $2, email = $3, email_verified = case when email = $3 then email_verified else false end, updated_at = now() where id_user = $4 returning ${userColumns}`, [firstName, lastName, email, req.auth.sub]); const user = result.rows[0]; if (!user) throw new ApiError(404, 'Utilisateur introuvable.'); if (!user.email_verified) await issueVerification(database, user); return res.json({ user: serializeUser(user) }) } catch (error) { if (error.code === '23505') return next(new ApiError(409, 'Cette adresse e-mail est déjà utilisée.')); return next(error) } }
+export async function changePassword(req, res, next) { try { const { current_password: currentPassword, new_password: newPassword, confirmation } = req.body; const errors = {}; if (!currentPassword) errors.current_password = 'Mot de passe actuel requis.'; if (typeof newPassword !== 'string' || newPassword.length < 8) errors.new_password = 'Le nouveau mot de passe doit contenir au moins 8 caractères.'; if (newPassword !== confirmation) errors.confirmation = 'Les mots de passe ne correspondent pas.'; if (Object.keys(errors).length) throw new ApiError(400, 'Certaines informations sont invalides.', errors); const database = requireDatabase(); const found = await database.query('select password from users where id_user = $1', [req.auth.sub]); if (!found.rows[0]) throw new ApiError(404, 'Utilisateur introuvable.'); if (!(await bcrypt.compare(currentPassword, found.rows[0].password))) throw new ApiError(400, 'Le mot de passe actuel est incorrect.', { current_password: 'Mot de passe actuel incorrect.' }); await database.query('update users set password = $1, updated_at = now() where id_user = $2', [await bcrypt.hash(newPassword, 12), req.auth.sub]); return res.status(204).send() } catch (error) { return next(error) } }
+export async function verifyEmail(req, res, next) { try { const token = typeof req.body?.token === 'string' ? req.body.token : ''; if (!token) throw new ApiError(400, 'Lien de vérification invalide.'); const result = await requireDatabase().query('update users set email_verified = true, email_verification_token_hash = null, email_verification_expires_at = null, updated_at = now() where email_verification_token_hash = $1 and email_verification_expires_at > now() returning id_user', [hashToken(token)]); if (!result.rows[0]) throw new ApiError(400, 'Ce lien de vérification est invalide ou expiré.'); return res.status(204).send() } catch (error) { return next(error) } }
+export async function resendVerification(req, res, next) { try { const database = requireDatabase(); const result = await database.query('select id_user, email, email_verified from users where id_user = $1', [req.auth.sub]); const user = result.rows[0]; if (!user) throw new ApiError(401, 'Utilisateur introuvable.'); if (!user.email_verified) await issueVerification(database, user); return res.status(204).send() } catch (error) { return next(error) } }
+export async function forgotPassword(req, res, next) { try { const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : ''; if (emailPattern.test(email)) { const database = requireDatabase(); const result = await database.query('select id_user, email from users where email = $1', [email]); const user = result.rows[0]; if (user) { const token = newToken(); await database.query('update users set password_reset_token_hash = $1, password_reset_expires_at = $2, updated_at = now() where id_user = $3', [hashToken(token), expiry(3600000), user.id_user]); await sendPasswordResetEmail({ email: user.email, token }) } } return res.status(204).send() } catch (error) { return next(error) } }
+export async function resetPassword(req, res, next) { try { const token = typeof req.body?.token === 'string' ? req.body.token : ''; const password = req.body?.password; const confirmation = req.body?.confirmation; if (!token || typeof password !== 'string' || password.length < 8 || password !== confirmation) throw new ApiError(400, 'Le lien ou le nouveau mot de passe est invalide.'); const result = await requireDatabase().query('update users set password = $1, password_reset_token_hash = null, password_reset_expires_at = null, updated_at = now() where password_reset_token_hash = $2 and password_reset_expires_at > now() returning id_user', [await bcrypt.hash(password, 12), hashToken(token)]); if (!result.rows[0]) throw new ApiError(400, 'Ce lien de réinitialisation est invalide ou expiré.'); return res.status(204).send() } catch (error) { return next(error) } }
+export async function deleteAccount(req, res, next) { try { const result = await requireDatabase().query('delete from users where id_user = $1 returning id_user', [req.auth.sub]); if (!result.rows[0]) throw new ApiError(404, 'Utilisateur introuvable.'); return res.status(204).send() } catch (error) { return next(error) } }

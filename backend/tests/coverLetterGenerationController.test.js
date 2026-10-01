@@ -3,6 +3,7 @@ import { createResponse } from './helpers.js'
 
 vi.mock('../src/config/database.js', () => ({ requireDatabase: vi.fn() }))
 vi.mock('../src/services/coverLetterGenerationService.js', () => ({ generateCoverLetter: vi.fn() }))
+vi.mock('../src/services/aiUsageService.js', () => ({ assertAiQuota: vi.fn(), consumeAiQuota: vi.fn() }))
 
 import { requireDatabase } from '../src/config/database.js'
 import { generateCoverLetter } from '../src/services/coverLetterGenerationService.js'

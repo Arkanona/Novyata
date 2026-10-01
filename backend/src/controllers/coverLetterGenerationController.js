@@ -1,6 +1,8 @@
 import { requireDatabase } from '../config/database.js'
 import { generateCoverLetter } from '../services/coverLetterGenerationService.js'
 import ApiError from '../utils/ApiError.js'
+import { AI_FEATURES } from '../config/plans.js'
+import { assertAiQuota, consumeAiQuota } from '../services/aiUsageService.js'
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -62,6 +64,7 @@ export async function createGeneratedCoverLetter(req, res, next) {
       database.query('select name, level from skills where id_resume = $1', [resumeId]),
       database.query('select name, level from languages where id_resume = $1', [resumeId]),
     ])
+    await assertAiQuota(database, req.auth.sub, AI_FEATURES.COVER_LETTER_GENERATION)
     const generation = await generateCoverLetter({
       resume: { ...resume, experiences: experiences.rows, educations: educations.rows, skills: skills.rows, languages: languages.rows },
       jobDescription,
@@ -69,6 +72,7 @@ export async function createGeneratedCoverLetter(req, res, next) {
       jobTitle,
       analysis,
     })
+    await consumeAiQuota(database, req.auth.sub, AI_FEATURES.COVER_LETTER_GENERATION)
     return res.json({ generation })
   } catch (error) { return next(error) }
 }

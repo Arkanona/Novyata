@@ -40,7 +40,7 @@ describe('resumeController', () => {
     requireDatabase.mockReturnValue(database)
     const res = createResponse()
     await createResume({ auth: { sub: userId }, body: { title_resume: ' CV Produit ', first_name: ' Marie ', last_name: ' Laurent ', job_title: ' Product Designer ' } }, res, vi.fn())
-    expect(database.query.mock.calls[0][1]).toEqual([userId, 'CV Produit', 'Marie', 'Laurent', 'Product Designer'])
+    expect(database.query.mock.calls[0][1]).toEqual([userId, 'CV Produit', 'Marie', 'Laurent', 'Product Designer', 'classic'])
     expect(res.status).toHaveBeenCalledWith(201)
     expect(res.json.mock.calls[0][0].resume.id_resume).toBe(resume.id_resume)
   })

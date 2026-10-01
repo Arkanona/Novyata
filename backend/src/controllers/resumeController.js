@@ -16,7 +16,8 @@ function validateResume(body) {
   if (!jobTitle || jobTitle.length < 2) errors.job_title = 'Le poste recherché doit contenir au moins 2 caractères.'
   if (Object.keys(errors).length) throw new ApiError(400, 'Certaines informations sont invalides.', errors)
 
-  return { titleResume, firstName, lastName, jobTitle }
+  const templateKey = ['classic', 'modern', 'minimal'].includes(body.template_key) ? body.template_key : 'classic'
+  return { titleResume, firstName, lastName, jobTitle, templateKey }
 }
 
 function validateResumeUpdate(body) {
@@ -82,11 +83,11 @@ export async function listResumes(req, res, next) {
 
 export async function createResume(req, res, next) {
   try {
-    const { titleResume, firstName, lastName, jobTitle } = validateResume(req.body)
+    const { titleResume, firstName, lastName, jobTitle, templateKey } = validateResume(req.body)
     const database = requireDatabase()
     const result = await database.query(
-      'insert into resumes (id_user, title_resume, first_name, last_name, job_title) values ($1, $2, $3, $4, $5) returning id_resume, title_resume, job_title, first_name, last_name, email, phone, city, summary, created_at, updated_at',
-      [req.auth.sub, titleResume, firstName, lastName, jobTitle],
+      'insert into resumes (id_user, title_resume, first_name, last_name, job_title, template_key) values ($1, $2, $3, $4, $5, $6) returning id_resume, title_resume, job_title, first_name, last_name, email, phone, city, summary, template_key, accent_color, font_size, created_at, updated_at',
+      [req.auth.sub, titleResume, firstName, lastName, jobTitle, templateKey],
     )
     return res.status(201).json({ resume: serializeResume(result.rows[0]) })
   } catch (error) {

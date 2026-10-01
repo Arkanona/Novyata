@@ -1,6 +1,8 @@
 import { requireDatabase } from '../config/database.js'
 import { analyzeJobDescription } from '../services/jobAnalysisService.js'
 import ApiError from '../utils/ApiError.js'
+import { AI_FEATURES } from '../config/plans.js'
+import { assertAiQuota, consumeAiQuota } from '../services/aiUsageService.js'
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const optionalText = (value, maxLength) => typeof value === 'string' ? value.trim().slice(0, maxLength) : ''
@@ -60,7 +62,9 @@ export async function analyzeJob(req, res, next) {
       database.query('select name, level from skills where id_resume = $1', [resumeId]),
       database.query('select name, level from languages where id_resume = $1', [resumeId]),
     ])
+    await assertAiQuota(database, req.auth.sub, AI_FEATURES.JOB_ANALYSIS)
     const analysis = await analyzeJobDescription({ resume: { ...resume, experiences: experiences.rows, educations: educations.rows, skills: skills.rows, languages: languages.rows }, jobDescription })
+    await consumeAiQuota(database, req.auth.sub, AI_FEATURES.JOB_ANALYSIS)
     const serializedAnalysis = JSON.stringify(analysis)
     logInsertPayload({ userId: req.auth.sub, resumeId, jobDescription, analysis })
     let saved

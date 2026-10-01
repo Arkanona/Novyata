@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, Trash2 } from 'lucide-react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import Button from '../components/common/Button'
 import ResumeEditor from '../components/resume/ResumeEditor'
 import { createResume, deleteResume, getResume } from '../services/resumeService'
@@ -12,6 +12,7 @@ function formatDate(date) {
 
 export default function ResumeEditorPage({ isNew = false }) {
   const { id } = useParams()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { user } = useAuth()
   const [form, setForm] = useState({ title_resume: 'Mon CV', first_name: '', last_name: '', job_title: '' })
@@ -26,13 +27,14 @@ export default function ResumeEditorPage({ isNew = false }) {
 
   useEffect(() => {
     if (isNew) {
-      setForm((current) => ({ ...current, first_name: user?.first_name || '', last_name: user?.last_name || '' }))
+      const template = searchParams.get('template')
+      setForm((current) => ({ ...current, first_name: user?.first_name || '', last_name: user?.last_name || '', ...(template && ['classic', 'modern', 'minimal'].includes(template) ? { template_key: template } : {}) }))
       return
     }
     setResume(null)
     setIsLoading(true)
     getResume(id).then(({ resume: currentResume }) => setResume(currentResume)).catch((error) => setApiError(error.message)).finally(() => setIsLoading(false))
-  }, [id, isNew, user])
+  }, [id, isNew, user, searchParams])
 
   function updateField(event) {
     const { name, value } = event.target

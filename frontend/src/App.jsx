@@ -3,8 +3,13 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import AppLayout from './components/layout/AppLayout'
 import PrivateRoute from './components/layout/PrivateRoute'
 import AuthPage from './pages/AuthPage'
+import { PasswordRecoveryPage, VerifyEmailPage } from './pages/AccountRecoveryPage'
 import HomePage from './pages/HomePage'
+import LegalPage from './pages/LegalPage'
+import FeaturesPage from './pages/FeaturesPage'
+import ModelsPage from './pages/ModelsPage'
 import NotFoundPage from './pages/NotFoundPage'
+import PricingPage from './pages/PricingPage'
 import { AuthProvider } from './store/AuthContext'
 
 const ApplicationEditorPage = lazy(() => import('./pages/ApplicationEditorPage'))
@@ -32,6 +37,17 @@ export default function App() {
     <Route path="/" element={<HomePage />} />
     <Route path="/connexion" element={<AuthPage mode="signin" />} />
     <Route path="/inscription" element={<AuthPage mode="signup" />} />
+    <Route path="/mot-de-passe-oublie" element={<PasswordRecoveryPage />} />
+    <Route path="/reinitialiser-mot-de-passe" element={<PasswordRecoveryPage reset />} />
+    <Route path="/verifier-email" element={<VerifyEmailPage />} />
+    <Route path="/pro" element={<PricingPage />} />
+    <Route path="/tarifs" element={<PricingPage />} />
+    <Route path="/fonctionnalites" element={<FeaturesPage />} />
+    <Route path="/modeles" element={<ModelsPage />} />
+    <Route path="/mentions-legales" element={<LegalPage />} />
+    <Route path="/confidentialite" element={<LegalPage />} />
+    <Route path="/conditions" element={<LegalPage />} />
+    <Route path="/cookies" element={<LegalPage />} />
     <Route element={<PrivateRoute />}><Route element={<AppLayout />}>
       <Route path="/dashboard" element={lazyPage(DashboardPage)} />
       <Route path="/cv" element={lazyPage(ResumeListPage)} />

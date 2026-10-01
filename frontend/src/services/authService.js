@@ -31,3 +31,7 @@ function authenticated(path, method, payload) { return request(path, { method, h
 export const updateProfile = (payload) => authenticated('/api/v1/auth/me', 'PATCH', payload)
 export const changePassword = (payload) => authenticated('/api/v1/auth/me/password', 'PATCH', payload)
 export const deleteAccount = () => authenticated('/api/v1/auth/me', 'DELETE')
+export const resendVerification = () => authenticated('/api/v1/auth/me/resend-verification', 'POST')
+export const verifyEmail = (token) => request('/api/v1/auth/verify-email', { method: 'POST', body: JSON.stringify({ token }) })
+export const forgotPassword = (email) => request('/api/v1/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) })
+export const resetPassword = (payload) => request('/api/v1/auth/reset-password', { method: 'POST', body: JSON.stringify(payload) })

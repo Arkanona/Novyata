@@ -18,12 +18,12 @@ export default function DashboardPage() {
     Promise.all([getResumes(), getApplications()]).then(([resumeData, applicationData]) => { setResumes(resumeData.resumes); setApplications(applicationData.applications) }).catch((requestError) => setError(requestError.message)).finally(() => setIsLoading(false))
   }, [])
 
-  const statistics = [
-    ['Candidatures envoyées', applications.filter((application) => application.status === 'Candidature envoyée').length],
-    ['En cours', applications.filter((application) => application.status === 'En cours d’étude').length],
-    ['Entretiens', applications.filter((application) => application.status === 'Entretien').length],
-    ['Propositions', applications.filter((application) => application.status === 'Proposition').length],
-  ]
+  const sent = applications.filter((application) => !['À postuler', 'Archivée'].includes(application.status))
+  const responses = applications.filter((application) => ['En cours d’étude', 'Entretien', 'Proposition', 'Refusée'].includes(application.status))
+  const interviews = applications.filter((application) => application.status === 'Entretien')
+  const offers = applications.filter((application) => application.status === 'Proposition')
+  const rate = (value) => sent.length ? `${Math.round((value.length / sent.length) * 100)} %` : '—'
+  const statistics = [['Candidatures envoyées', sent.length], ['Réponses', responses.length], ['Entretiens', interviews.length], ['Propositions', offers.length], ['Taux de réponse', rate(responses)], ['Taux entretien', rate(interviews)]]
 
   return <div className="app-page"><header className="app-header"><div><p className="crumb">Bonjour {user?.first_name}</p><h1>Vue d'ensemble</h1></div><Link to="/cv/nouveau" className="button button--primary"><CirclePlus size={17} /> Créer un CV</Link></header>
     {isLoading && <div className="dashboard-feedback">Chargement de vos CV…</div>}

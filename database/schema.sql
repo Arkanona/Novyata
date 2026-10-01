@@ -11,6 +11,16 @@ create table if not exists users (
   last_name varchar(100) not null,
   email varchar(255) not null unique,
   password varchar(255) not null,
+  plan varchar(20) not null default 'free',
+  subscription_status varchar(40) not null default 'free',
+  stripe_customer_id varchar(255),
+  stripe_subscription_id varchar(255),
+  current_period_end timestamptz,
+  email_verified boolean not null default false,
+  email_verification_token_hash varchar(255),
+  email_verification_expires_at timestamptz,
+  password_reset_token_hash varchar(255),
+  password_reset_expires_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -55,6 +65,7 @@ create table if not exists applications (
   id_user uuid not null references users(id_user) on delete cascade,
   id_resume uuid references resumes(id_resume) on delete set null,
   id_cover_letter uuid references cover_letters(id_cover_letter) on delete set null,
+  id_job_analysis uuid,
   company_name varchar(160) not null,
   job_title varchar(160) not null,
   location varchar(160),
@@ -70,6 +81,61 @@ create table if not exists applications (
   constraint applications_status_check check (status in ('À postuler', 'Candidature envoyée', 'En cours d’étude', 'Entretien', 'Proposition', 'Refusée', 'Archivée'))
 );
 
+create table if not exists application_events (
+  id_application_event uuid primary key default gen_random_uuid(),
+  id_application uuid not null references applications(id_application) on delete cascade,
+  type varchar(60) not null,
+  title varchar(160) not null,
+  description text,
+  event_date timestamptz not null default now(),
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists application_followups (
+  id_followup uuid primary key default gen_random_uuid(),
+  id_application uuid not null references applications(id_application) on delete cascade,
+  type varchar(40) not null default 'Première relance',
+  content text not null,
+  sent_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists interviews (
+  id_interview uuid primary key default gen_random_uuid(),
+  id_application uuid not null references applications(id_application) on delete cascade,
+  interview_date timestamptz,
+  interview_type varchar(100),
+  people_met text,
+  feeling varchar(100),
+  questions_asked text,
+  key_points text,
+  next_steps text,
+  notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists saved_answers (
+  id_saved_answer uuid primary key default gen_random_uuid(),
+  id_user uuid not null references users(id_user) on delete cascade,
+  category varchar(100) not null,
+  title varchar(160) not null,
+  content text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists interview_sessions (
+  id_interview_session uuid primary key default gen_random_uuid(),
+  id_application uuid not null references applications(id_application) on delete cascade,
+  id_user uuid not null references users(id_user) on delete cascade,
+  exchanges jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists job_analyses (
   id_job_analysis uuid primary key default gen_random_uuid(),
   id_user uuid not null references users(id_user) on delete cascade,
@@ -81,6 +147,23 @@ create table if not exists job_analyses (
   analysis_result jsonb not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
+);
+
+create table if not exists ai_usage (
+  id_ai_usage uuid primary key default gen_random_uuid(),
+  id_user uuid not null references users(id_user) on delete cascade,
+  feature varchar(60) not null,
+  period varchar(7) not null,
+  count integer not null default 0 check (count >= 0),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint ai_usage_user_feature_period_unique unique (id_user, feature, period)
+);
+
+create table if not exists stripe_webhook_events (
+  stripe_event_id varchar(255) primary key,
+  event_type varchar(120) not null,
+  processed_at timestamptz not null default now()
 );
 
 create table if not exists experiences (
@@ -179,6 +262,26 @@ alter table resumes
   add column if not exists accent_color varchar(7) not null default '#314A67',
   add column if not exists font_size varchar(10) not null default 'normal';
 
+alter table users
+  add column if not exists plan varchar(20) not null default 'free',
+  add column if not exists subscription_status varchar(40) not null default 'free',
+  add column if not exists stripe_customer_id varchar(255),
+  add column if not exists stripe_subscription_id varchar(255),
+  add column if not exists current_period_end timestamptz,
+  add column if not exists email_verified boolean not null default false,
+  add column if not exists email_verification_token_hash varchar(255),
+  add column if not exists email_verification_expires_at timestamptz,
+  add column if not exists password_reset_token_hash varchar(255),
+  add column if not exists password_reset_expires_at timestamptz;
+
+alter table users add column if not exists job_search_preferences jsonb not null default '{}'::jsonb;
+alter table applications add column if not exists id_job_analysis uuid;
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'applications_job_analysis_fk') then
+    alter table applications add constraint applications_job_analysis_fk foreign key (id_job_analysis) references job_analyses(id_job_analysis) on delete set null;
+  end if;
+end $$;
+
 alter table experiences
   add column if not exists city varchar(160),
   add column if not exists created_at timestamptz not null default now(),
@@ -203,12 +306,20 @@ create index if not exists cover_letters_user_id_idx on cover_letters(id_user);
 create index if not exists cover_letters_resume_id_idx on cover_letters(id_resume);
 create index if not exists applications_user_id_idx on applications(id_user);
 create index if not exists applications_status_idx on applications(status);
+create index if not exists application_events_application_date_idx on application_events(id_application, event_date desc);
+create index if not exists application_followups_application_idx on application_followups(id_application);
+create index if not exists interviews_application_idx on interviews(id_application);
+create index if not exists saved_answers_user_idx on saved_answers(id_user);
+create index if not exists interview_sessions_application_idx on interview_sessions(id_application, updated_at desc);
 create index if not exists job_analyses_user_id_idx on job_analyses(id_user);
 create index if not exists job_analyses_resume_id_idx on job_analyses(id_resume);
 create index if not exists experiences_resume_id_idx on experiences(id_resume);
 create index if not exists educations_resume_id_idx on educations(id_resume);
 create index if not exists skills_resume_id_idx on skills(id_resume);
 create index if not exists languages_resume_id_idx on languages(id_resume);
+create index if not exists ai_usage_user_period_idx on ai_usage(id_user, period);
+create unique index if not exists users_stripe_customer_unique_idx on users(stripe_customer_id) where stripe_customer_id is not null;
+create unique index if not exists users_stripe_subscription_unique_idx on users(stripe_subscription_id) where stripe_subscription_id is not null;
 
 -- 4. Automatic update timestamps.
 create or replace function set_updated_at()
@@ -247,3 +358,15 @@ create trigger skills_set_updated_at before update on skills for each row execut
 
 drop trigger if exists languages_set_updated_at on languages;
 create trigger languages_set_updated_at before update on languages for each row execute function set_updated_at();
+
+drop trigger if exists ai_usage_set_updated_at on ai_usage;
+create trigger ai_usage_set_updated_at before update on ai_usage for each row execute function set_updated_at();
+
+drop trigger if exists application_followups_set_updated_at on application_followups;
+create trigger application_followups_set_updated_at before update on application_followups for each row execute function set_updated_at();
+drop trigger if exists interviews_set_updated_at on interviews;
+create trigger interviews_set_updated_at before update on interviews for each row execute function set_updated_at();
+drop trigger if exists saved_answers_set_updated_at on saved_answers;
+create trigger saved_answers_set_updated_at before update on saved_answers for each row execute function set_updated_at();
+drop trigger if exists interview_sessions_set_updated_at on interview_sessions;
+create trigger interview_sessions_set_updated_at before update on interview_sessions for each row execute function set_updated_at();

@@ -139,6 +139,10 @@ export function buildAnalysisSources(compactResume = {}) {
   return sources
 }
 
+function serializeSourcesForPrompt(sources) {
+  return sources.map(({ id, text }) => `${id}: ${text}`).join('\n')
+}
+
 function maxOutputTokens() {
   const value = Number.parseInt(process.env.OPENAI_MAX_OUTPUT_TOKENS, 10)
   return Number.isFinite(value) && value >= 800 ? value : 1650
@@ -239,7 +243,7 @@ function compactJobDescription(value) {
 }
 
 function analysisInstructions() {
-  return `Analyse les sources CV et l’offre. Max ${analysisLimits.requirements} exigences scorables, IDs req_1… ; ignore les missions. Classe chaque exigence une fois avec requirementId. Pour chaque match, choisis uniquement un sourceId fourni ; n’invente aucun ID ni information. Les sources sont par pertinence décroissante. Limites ${analysisLimits.strongMatches}/${analysisLimits.partialMatches}/${analysisLimits.importantMissingSkills}/${analysisLimits.optionalMissingSkills}/${analysisLimits.importantKeywords}/${analysisLimits.suggestions}. Champs très courts ; scoreExplanation : 2 phrases.`
+  return `Analyse CV/offre. Max ${analysisLimits.requirements} exigences scorables (req_1…), ignore les missions et classe chacune une fois. Chaque match utilise uniquement un sourceId fourni ; n’invente rien. Limites ${analysisLimits.strongMatches}/${analysisLimits.partialMatches}/${analysisLimits.importantMissingSkills}/${analysisLimits.optionalMissingSkills}/${analysisLimits.importantKeywords}/${analysisLimits.suggestions}. Textes courts ; scoreExplanation : 2 phrases.`
 }
 
 function ensureObject(item, keys, path, allowEmpty = []) {
@@ -395,7 +399,7 @@ export async function analyzeJobDescription({ resume, jobDescription }) {
         reasoning: { effort: 'low' },
         max_output_tokens: maxOutputTokens(),
         instructions: analysisInstructions(),
-        input: `Sources CV:\n${JSON.stringify(analysisSources)}\nOffre:\n${analysisJobDescription}`,
+        input: `Sources CV (id: texte):\n${serializeSourcesForPrompt(analysisSources)}\nOffre:\n${analysisJobDescription}`,
         text: { verbosity: 'low', format: { type: 'json_schema', name: 'job_analysis', strict: true, schema: analysisSchemaForSources(analysisSources) } },
       }),
     })

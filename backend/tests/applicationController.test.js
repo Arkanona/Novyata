@@ -67,7 +67,7 @@ describe('applicationController', () => {
     requireDatabase.mockReturnValue(database)
     const res = createResponse()
     await updateApplication({ auth: { sub: userId }, params: { id: applicationId }, body: { ...payload, id_resume: null, id_cover_letter: null, status: 'Entretien' } }, res, vi.fn())
-    expect(database.query.mock.calls[0][1]).toContain('Entretien')
+    expect(database.query.mock.calls[1][1]).toContain('Entretien')
     expect(res.json.mock.calls[0][0].application.status).toBe('Entretien')
   })
 

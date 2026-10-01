@@ -18,7 +18,8 @@
     "express-rate-limit": "^8.7.0",
     "helmet": "^8.3.0",
     "jsonwebtoken": "latest",
-    "pg": "latest"
+    "pg": "latest",
+    "stripe": "^23.0.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

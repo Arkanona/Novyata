@@ -7,11 +7,10 @@ const proposalSchema = {
     id: { type: 'string' },
     field: { type: 'string', enum: ['summary', 'experience'] },
     targetIndex: { type: 'integer', minimum: 0 },
-    currentText: { type: 'string' },
     proposedText: { type: 'string' },
     reason: { type: 'string' },
   },
-  required: ['id', 'field', 'targetIndex', 'currentText', 'proposedText', 'reason'],
+  required: ['id', 'field', 'targetIndex', 'proposedText', 'reason'],
 }
 
 const adaptationSchema = {
@@ -27,7 +26,18 @@ const timeout = () => {
 }
 const maxOutputTokens = () => {
   const value = Number.parseInt(process.env.OPENAI_MAX_OUTPUT_TOKENS, 10)
-  return Number.isFinite(value) && value >= 800 ? Math.min(value, 1800) : 1800
+  return Number.isFinite(value) && value >= 800 ? Math.min(value, 1650) : 1650
+}
+const isDevelopment = () => process.env.NODE_ENV !== 'production'
+
+function invalidAdaptation(field, expected, received) {
+  if (isDevelopment()) console.error('Invalid CV adaptation:', {
+    field,
+    expected,
+    receivedType: Array.isArray(received) ? 'array' : typeof received,
+    receivedLength: typeof received === 'string' ? received.length : Array.isArray(received) ? received.length : undefined,
+  })
+  throw new ApiError(502, 'Le service d’adaptation a renvoyé une réponse invalide.')
 }
 
 function outputText(response) {
@@ -51,20 +61,36 @@ function compactAnalysis(analysis = {}) {
 }
 
 export function validateAdaptation(value, resume) {
-  if (!value || !Array.isArray(value.proposals) || value.proposals.length > 6 || value.proposals.some((proposal) => !proposal || typeof proposal !== 'object')) throw new ApiError(502, 'Le service d’adaptation a renvoyé une réponse invalide.')
+  if (!value || typeof value !== 'object' || !Array.isArray(value.proposals)) invalidAdaptation('proposals', 'an array of proposals', value?.proposals)
+  if (value.proposals.length > 6) invalidAdaptation('proposals', 'at most 6 proposals', value.proposals)
   const ids = new Set()
   const targets = new Set()
-  const proposals = value.proposals.reduce((result, proposal) => {
+  const proposals = value.proposals.map((proposal, index) => {
+    if (!proposal || typeof proposal !== 'object' || Array.isArray(proposal)) invalidAdaptation(`proposals[${index}]`, 'an object', proposal)
+    // currentText is reconstructed for display and comes back unchanged from
+    // the editor when applying a selection. It is never trusted for updates.
+    const unexpected = Object.keys(proposal).find((key) => !['id', 'field', 'targetIndex', 'currentText', 'proposedText', 'reason'].includes(key))
+    if (unexpected) invalidAdaptation(`proposals[${index}].${unexpected}`, 'no additional properties', proposal[unexpected])
     const id = cleanText(proposal.id, 60)
     const field = proposal.field
     const targetIndex = proposal.targetIndex
-    const currentText = cleanText(proposal.currentText, 2000)
     const proposedText = cleanText(proposal.proposedText, 2000)
     const reason = cleanText(proposal.reason, 180)
     const target = `${field}:${targetIndex}`
-    if (!id || !['summary', 'experience'].includes(field) || !Number.isInteger(targetIndex) || targetIndex < 0 || !currentText || !proposedText || !reason || ids.has(id) || targets.has(target) || sourceText(resume, field, targetIndex) !== currentText || currentText === proposedText) throw new ApiError(502, 'Le service d’adaptation a renvoyé une réponse invalide.')
-    ids.add(id); targets.add(target); result.push({ id, field, targetIndex, currentText, proposedText, reason }); return result
-  }, [])
+    const currentText = sourceText(resume, field, targetIndex)
+    if (!id) invalidAdaptation(`proposals[${index}].id`, 'a non-empty string', proposal.id)
+    if (!['summary', 'experience'].includes(field)) invalidAdaptation(`proposals[${index}].field`, 'summary or experience', field)
+    if (!Number.isInteger(targetIndex) || targetIndex < 0) invalidAdaptation(`proposals[${index}].targetIndex`, 'a non-negative integer', targetIndex)
+    if (!currentText) invalidAdaptation(`proposals[${index}].targetIndex`, 'an existing editable CV field', targetIndex)
+    if (!proposedText) invalidAdaptation(`proposals[${index}].proposedText`, 'a non-empty string', proposal.proposedText)
+    if (!reason) invalidAdaptation(`proposals[${index}].reason`, 'a non-empty string', proposal.reason)
+    if (ids.has(id)) invalidAdaptation(`proposals[${index}].id`, 'a unique ID', id)
+    if (targets.has(target)) invalidAdaptation(`proposals[${index}]`, 'one proposal per editable field', target)
+    // A no-op proposal is harmless. It is omitted instead of turning an
+    // otherwise usable AI response into a 502.
+    if (currentText === proposedText) return null
+    ids.add(id); targets.add(target); return { id, field, targetIndex, currentText, proposedText, reason }
+  }).filter(Boolean)
   return { proposals }
 }
 
@@ -85,7 +111,7 @@ export async function proposeCvAdaptation({ resume, analysis, jobDescription }) 
         model: process.env.OPENAI_MODEL || 'gpt-6-luna',
         reasoning: { effort: 'low' },
         max_output_tokens: maxOutputTokens(),
-        instructions: 'Propose au plus 6 reformulations ciblées d’un CV pour cette offre. Utilise uniquement les faits fournis. Ne crée aucune expérience, compétence, technologie, diplôme, résultat ni responsabilité. Modifie seulement summary ou description d’expérience. currentText doit être exactement le texte source, targetIndex désigne l’expérience (0 commence la liste) et reason est courte. Réponds uniquement au JSON conforme au schéma.',
+        instructions: 'Propose au plus 6 reformulations ciblées pour cette offre. Utilise uniquement les faits fournis : n’invente aucune expérience, compétence, technologie, diplôme, résultat ou responsabilité. Modifie seulement summary ou description d’expérience. field et targetIndex désignent le champ modifiable ; ne renvoie pas currentText. reason courte. Réponds au JSON conforme au schéma.',
         input: `CV utile :\n${JSON.stringify(context)}\n\nChamps modifiables :\n${JSON.stringify(editable)}\n\nAnalyse sauvegardée :\n${JSON.stringify(compactAnalysis(analysis))}\n\nOffre :\n${jobDescription}`,
         text: { verbosity: 'low', format: { type: 'json_schema', name: 'cv_adaptation', strict: true, schema: adaptationSchema } },
       }),

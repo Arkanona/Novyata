@@ -69,7 +69,7 @@ describe('authController', () => {
     expect(bcrypt.hash).toHaveBeenCalledWith('Password123', 12)
     expect(database.query.mock.calls[0][1]).toEqual(['Marie', 'Laurent', 'marie@example.com', 'hash'])
     expect(res.status).toHaveBeenCalledWith(201)
-    expect(res.json.mock.calls[0][0]).toEqual({ user: { id_user: user.id_user, first_name: 'Marie', last_name: 'Laurent', email: 'marie@example.com', created_at: user.created_at }, token: 'signed-token' })
+    expect(res.json.mock.calls[0][0]).toEqual(expect.objectContaining({ user: expect.objectContaining({ id_user: user.id_user, first_name: 'Marie', last_name: 'Laurent', email: 'marie@example.com', created_at: user.created_at, plan: 'free', email_verified: false }), token: 'signed-token', verification_required: true }))
   })
 
   it('reports duplicate email cleanly', async () => {

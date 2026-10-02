@@ -19,6 +19,20 @@ describe('authController', () => {
     process.env.JWT_EXPIRES_IN = '7d'
   })
 
+  it('returns centralized Free capabilities from the authenticated user record', async () => {
+    requireDatabase.mockReturnValue({ query: vi.fn().mockResolvedValue({ rows: [{ ...user, plan: 'free' }] }) })
+    const res = createResponse()
+    await me({ auth: { sub: user.id_user } }, res, vi.fn())
+    expect(res.json.mock.calls[0][0].user.capabilities).toMatchObject({ templates: ['classic', 'modern', 'minimal'], advancedSections: false, resumeVariants: false })
+  })
+
+  it('returns Pro capabilities only when the database plan is Pro', async () => {
+    requireDatabase.mockReturnValue({ query: vi.fn().mockResolvedValue({ rows: [{ ...user, plan: 'pro' }] }) })
+    const res = createResponse()
+    await me({ auth: { sub: user.id_user } }, res, vi.fn())
+    expect(res.json.mock.calls[0][0].user.capabilities).toMatchObject({ templates: expect.arrayContaining(['classic', 'modern', 'minimal', 'corporate', 'elegant', 'tech', 'creative', 'student', 'manager']), advancedSections: true, resumeVariants: true })
+  })
+
   it('stores only valid, trimmed search preferences for the authenticated user', async () => {
     const query = vi.fn().mockResolvedValue({ rows: [{ ...user, job_search_preferences: { roles: 'Product designer', remote_work: 'Hybride' } }] })
     requireDatabase.mockReturnValue({ query })

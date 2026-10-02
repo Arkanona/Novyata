@@ -15,6 +15,7 @@ async function request(path, options = {}) {
 
 export const applicationStatuses = ['À postuler', 'Candidature envoyée', 'En cours d’étude', 'Entretien', 'Proposition', 'Refusée', 'Archivée']
 export const getApplications = () => request('/api/v1/applications')
+export const getAdvancedApplicationStatistics = (period = 90) => request('/api/v1/applications/advanced-statistics?period=' + encodeURIComponent(period))
 export const getApplication = (id) => request('/api/v1/applications/' + id)
 export const createApplication = (payload) => request('/api/v1/applications', { method: 'POST', body: JSON.stringify(payload) })
 export const updateApplication = (id, payload) => request('/api/v1/applications/' + id, { method: 'PATCH', body: JSON.stringify(payload) })

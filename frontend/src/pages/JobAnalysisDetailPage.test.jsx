@@ -41,7 +41,7 @@ describe('JobAnalysisDetailPage', () => {
   })
 
   it('lets the user accept one proposal and creates an adapted copy only', async () => {
-    useAuth.mockReturnValue({ user: { first_name: 'Marie' } })
+    useAuth.mockReturnValue({ user: { first_name: 'Marie', plan: 'pro' } })
     getJobAnalysis.mockResolvedValue({ job_analysis: { id_resume: resumeId, company_name: 'CloudNova', job_title: 'Product Designer', job_description: 'Offre test', analysis: { matchScore: 82, scoreExplanation: 'Bon score.', strongMatches: [], partialMatches: [], importantMissingSkills: [], optionalMissingSkills: [], importantKeywords: [], suggestions: [] } } })
     getResume.mockResolvedValue({ resume: { id_resume: resumeId, summary: 'Designer produit.' } })
     getCvAdaptationProposals.mockResolvedValue({ adaptation: { proposals: [proposal] } })
@@ -56,5 +56,15 @@ describe('JobAnalysisDetailPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Créer mon CV adapté/ }))
     await waitFor(() => expect(applyCvAdaptation).toHaveBeenCalledWith(analysisId, { proposals: [proposal], acceptedIds: ['summary-1'] }))
     await waitFor(() => expect(screen.getByText('Éditeur du CV adapté')).toBeTruthy())
+  })
+
+  it('shows a Pro explanation instead of exposing CV adaptation to Free users', async () => {
+    useAuth.mockReturnValue({ user: { first_name: 'Marie', plan: 'free' } })
+    getJobAnalysis.mockResolvedValue({ job_analysis: { id_resume: resumeId, company_name: 'CloudNova', analysis: { matchScore: 70, strongMatches: [], partialMatches: [], importantMissingSkills: [], optionalMissingSkills: [], importantKeywords: [], suggestions: [] } } })
+    getResume.mockResolvedValue({ resume: { id_resume: resumeId } })
+    render(<MemoryRouter initialEntries={[`/analyses/${analysisId}`]}><Routes><Route path="/analyses/:id" element={<JobAnalysisDetailPage />} /></Routes></MemoryRouter>)
+    await waitFor(() => expect(screen.getByText(/disponibles avec Novyata Pro/)).toBeTruthy())
+    expect(screen.getByRole('link', { name: 'Découvrir Pro' }).getAttribute('href')).toBe('/tarifs')
+    expect(screen.queryByRole('button', { name: 'Adapter mon CV à cette offre' })).toBeNull()
   })
 })

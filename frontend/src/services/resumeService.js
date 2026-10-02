@@ -52,3 +52,8 @@ export function deleteSkill(resumeId, skillId) { return request('/api/v1/resumes
 export function createLanguage(resumeId, payload) { return request('/api/v1/resumes/' + resumeId + '/languages', { method: 'POST', body: JSON.stringify(payload) }) }
 export function updateLanguage(resumeId, languageId, payload) { return request('/api/v1/resumes/' + resumeId + '/languages/' + languageId, { method: 'PATCH', body: JSON.stringify(payload) }) }
 export function deleteLanguage(resumeId, languageId) { return request('/api/v1/resumes/' + resumeId + '/languages/' + languageId, { method: 'DELETE' }) }
+export function createCustomResumeSection(resumeId, payload) { return request('/api/v1/resumes/' + resumeId + '/sections', { method: 'POST', body: JSON.stringify(payload) }) }
+export function updateCustomResumeSection(resumeId, sectionId, payload) { return request('/api/v1/resumes/' + resumeId + '/sections/' + sectionId, { method: 'PATCH', body: JSON.stringify(payload) }) }
+export function deleteCustomResumeSection(resumeId, sectionId) { return request('/api/v1/resumes/' + resumeId + '/sections/' + sectionId, { method: 'DELETE' }) }
+export function updateResumeSectionOrder(resumeId, sectionOrder) { return request('/api/v1/resumes/' + resumeId + '/section-order', { method: 'PUT', body: JSON.stringify({ section_order: sectionOrder }) }) }
+export function createResumeVariant(resumeId, titleResume) { return request('/api/v1/resumes/' + resumeId + '/variants', { method: 'POST', body: JSON.stringify({ title_resume: titleResume }) }) }

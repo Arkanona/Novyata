@@ -5,11 +5,13 @@ import { createFollowup, createThankYou, markFollowupSent, updateFollowup } from
 import { createInterview, updateInterview } from '../controllers/interviewController.js'
 import { createInterviewPreparation } from '../controllers/interviewPreparationController.js'
 import { completeInterviewSimulation, createInterviewSimulation } from '../controllers/interviewSimulationController.js'
+import { getAdvancedStatistics } from '../controllers/advancedStatisticsController.js'
 
 const router = Router()
 
 router.use(authenticate)
 router.get('/', listApplications)
+router.get('/advanced-statistics', getAdvancedStatistics)
 router.post('/', createApplication)
 router.get('/:id', getApplication)
 router.get('/:id/dossier', getApplicationDossier)

@@ -1,5 +1,6 @@
 import { requireDatabase } from '../config/database.js'
 import ApiError from '../utils/ApiError.js'
+import { presentAnalysisForPlan } from '../utils/analysisPresentation.js'
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -14,7 +15,7 @@ function serializeAnalysis(row, detailed = false) {
     created_at: row.created_at,
     updated_at: row.updated_at,
   }
-  return detailed ? { ...base, job_description: row.job_description, analysis: { ...row.analysis_result, id_job_analysis: row.id_job_analysis, created_at: row.created_at, updated_at: row.updated_at } } : base
+  return detailed ? { ...base, job_description: row.job_description, analysis: { ...presentAnalysisForPlan(row.analysis_result, row.plan), id_job_analysis: row.id_job_analysis, created_at: row.created_at, updated_at: row.updated_at } } : base
 }
 
 export async function listJobAnalyses(req, res, next) {
@@ -27,7 +28,7 @@ export async function listJobAnalyses(req, res, next) {
 export async function getJobAnalysis(req, res, next) {
   try {
     if (!uuidPattern.test(req.params.id)) throw new ApiError(400, 'Identifiant d’analyse invalide.')
-    const result = await requireDatabase().query('select job_analyses.id_job_analysis, job_analyses.id_resume, resumes.title_resume, job_analyses.company_name, job_analyses.job_title, job_analyses.job_description, job_analyses.match_score, job_analyses.analysis_result, job_analyses.created_at, job_analyses.updated_at from job_analyses join resumes on resumes.id_resume = job_analyses.id_resume where job_analyses.id_job_analysis = $1 and job_analyses.id_user = $2', [req.params.id, req.auth.sub])
+    const result = await requireDatabase().query('select job_analyses.id_job_analysis, job_analyses.id_resume, resumes.title_resume, users.plan, job_analyses.company_name, job_analyses.job_title, job_analyses.job_description, job_analyses.match_score, job_analyses.analysis_result, job_analyses.created_at, job_analyses.updated_at from job_analyses join resumes on resumes.id_resume = job_analyses.id_resume join users on users.id_user = job_analyses.id_user where job_analyses.id_job_analysis = $1 and job_analyses.id_user = $2', [req.params.id, req.auth.sub])
     if (!result.rows[0]) throw new ApiError(404, 'Analyse introuvable.')
     return res.json({ job_analysis: serializeAnalysis(result.rows[0], true) })
   } catch (error) { return next(error) }

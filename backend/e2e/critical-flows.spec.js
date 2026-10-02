@@ -35,7 +35,7 @@ test('CV : création, personnalisation et réouverture', async ({ page }) => {
   await page.getByRole('button', { name: 'Enregistrer', exact: true }).last().click()
   await page.getByLabel('Ajouter une compétence personnalisée').fill('Figma')
   await page.getByRole('button', { name: '+ Ajouter', exact: true }).click()
-  await page.getByRole('button', { name: 'Moderne' }).click()
+  await page.getByRole('button', { name: 'Utiliser ce modèle' }).first().click()
   await page.getByRole('button', { name: 'Grand' }).click()
   await page.getByLabel('Prénom').fill('Élise')
   await page.getByRole('button', { name: 'Enregistrer', exact: true }).first().click()
@@ -44,6 +44,92 @@ test('CV : création, personnalisation et réouverture', async ({ page }) => {
   await page.locator('.editor-actions').getByRole('button', { name: 'Supprimer', exact: true }).click()
   await page.getByRole('button', { name: 'Supprimer définitivement' }).click()
   await expect(page).toHaveURL(/\/dashboard$/)
+})
+
+test('Free : les templates Pro sont visibles mais renvoient vers les tarifs', async ({ page }) => {
+  await authenticatedPage(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/cv/f8c5d2f2-6ff2-43d2-9e4f-5443200f6d4b')
+  await expect(page.getByText('Corporate', { exact: true }).first()).toBeVisible()
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  await page.getByRole('link', { name: 'Débloquer avec Novyata Pro' }).first().click()
+  await expect(page).toHaveURL(/\/tarifs$/)
+})
+
+test('Pro : sélection de template, section avancée, réorganisation, variante et export PDF', async ({ page }) => {
+  test.setTimeout(90_000)
+  const state = await authenticatedPage(page)
+  state.user.plan = 'pro'
+  await page.goto('/cv/f8c5d2f2-6ff2-43d2-9e4f-5443200f6d4b')
+  const corporateCard = page.locator('.template-card').nth(3)
+  await corporateCard.getByRole('button', { name: 'Utiliser ce modèle' }).click()
+  const templateNames = ['Corporate', 'Élégant', 'Tech', 'Créatif sobre', 'Étudiant / Junior', 'Manager / Cadre']
+  for (let index = 3; index < 9; index += 1) {
+    const card = page.locator('.template-card').nth(index)
+    if (index !== 3) await card.getByRole('button', { name: 'Utiliser ce modèle' }).click()
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+    const paperMetrics = await page.getByRole('region', { name: 'Aperçu du CV' }).locator('.resume-preview-paper').evaluate((paper) => ({ clientHeight: paper.clientHeight, scrollHeight: paper.scrollHeight }))
+    expect(paperMetrics.scrollHeight, `${templateNames[index - 3]} doit tenir dans son format A4`).toBeLessThanOrEqual(paperMetrics.clientHeight)
+    const downloadPromise = page.waitForEvent('download')
+    const downloadButton = page.getByRole('button', { name: 'Télécharger en PDF' })
+    await expect(downloadButton).toBeEnabled()
+    await downloadButton.click()
+    expect((await downloadPromise).suggestedFilename()).toMatch(/\.pdf$/i)
+  }
+  await page.locator('.template-card').nth(3).getByRole('button', { name: 'Utiliser ce modèle' }).click()
+  await page.getByRole('button', { name: 'Ajouter une section' }).click()
+  await page.getByLabel('Titre').fill('Projets')
+  await page.getByLabel('Contenu').fill('Prototype produit livré en équipe.')
+  await page.getByRole('button', { name: 'Enregistrer la section' }).click()
+  await expect(page.getByText('Projets', { exact: true }).first()).toBeVisible()
+  const reorderResponsePromise = page.waitForResponse((response) => response.url().includes('/section-order'))
+  await page.getByRole('button', { name: 'Descendre Profil' }).click()
+  const reorderResponse = await reorderResponsePromise
+  expect(reorderResponse.status()).toBe(200)
+  expect(state.resume.section_order.slice(0, 2)).toEqual(['experiences', 'summary'])
+  await page.getByLabel('Nom de la nouvelle variante').fill('Version Projets')
+  await page.getByRole('button', { name: 'Créer une variante' }).click()
+  await expect(page).toHaveURL(/\/cv\/variant-e2e$/)
+  await expect(page.getByText('Prototype produit livré en équipe.').first()).toBeVisible()
+  const downloadPromise = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Télécharger en PDF' }).click()
+  const download = await downloadPromise
+  expect(download.suggestedFilename()).toMatch(/\.pdf$/i)
+  await page.goto('/historique')
+  await expect(page.getByRole('heading', { name: 'Historique complet' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Novyata' })).toBeVisible()
+  await page.goto('/dashboard')
+  await expect(page.getByRole('heading', { name: 'Statistiques avancées' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Résultats observés par CV' })).toBeVisible()
+})
+
+test('Pro : éditeur, sélection de template et sections avancées utilisables sur mobile', async ({ page }) => {
+  const state = await authenticatedPage(page)
+  state.user.plan = 'pro'
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/cv/f8c5d2f2-6ff2-43d2-9e4f-5443200f6d4b')
+
+  const techCard = page.locator('.template-card').nth(5)
+  await techCard.getByRole('button', { name: 'Utiliser ce modèle' }).click()
+  await expect(techCard).toHaveClass(/template-card--selected/)
+  await expect(page.getByRole('button', { name: 'Télécharger en PDF' })).toBeEnabled()
+
+  const paper = page.getByRole('region', { name: 'Aperçu du CV' }).locator('.resume-preview-paper')
+  const dimensions = await paper.evaluate((element) => ({ width: element.offsetWidth, height: element.offsetHeight }))
+  expect(dimensions.width / dimensions.height).toBeCloseTo(210 / 297, 2)
+
+  await page.getByRole('button', { name: 'Ajouter une section' }).click()
+  await page.getByLabel('Titre').fill('Projets mobiles')
+  await page.getByLabel('Contenu').fill('Interface conçue et testée sur mobile.')
+  await page.getByRole('button', { name: 'Enregistrer la section' }).click()
+  await expect(page.getByText('Projets mobiles', { exact: true }).first()).toBeVisible()
+  for (const width of [1280, 1024, 768, 390]) {
+    await page.setViewportSize({ width, height: 844 })
+    const viewport = await page.evaluate(() => ({ width: window.innerWidth, documentWidth: document.documentElement.scrollWidth }))
+    expect(viewport.documentWidth, `Pas de scroll horizontal à ${width}px`).toBeLessThanOrEqual(viewport.width)
+    const responsivePaper = await paper.evaluate((element) => ({ width: element.offsetWidth, height: element.offsetHeight }))
+    expect(responsivePaper.width / responsivePaper.height).toBeCloseTo(210 / 297, 2)
+  }
 })
 
 test('dépassement A4 : sauvegarde et export sont bloqués', async ({ page }) => {
@@ -104,6 +190,7 @@ test('analyse d’offre : résultat, génération puis sauvegarde de lettre mock
 
 test('analyse enregistrée : création contrôlée d’une copie adaptée du CV', async ({ page }) => {
   const state = await authenticatedPage(page)
+  state.user.plan = 'pro'
   await page.goto('/analyses/' + state.jobAnalysis.id_job_analysis)
   await page.getByRole('button', { name: 'Adapter mon CV à cette offre' }).click()
   await expect(page.getByText('Product Designer spécialisé dans les parcours utilisateurs et Figma.')).toBeVisible()
@@ -114,6 +201,7 @@ test('analyse enregistrée : création contrôlée d’une copie adaptée du CV'
 
 test('candidature : entretien, simulation, remerciement et timeline persistent', async ({ page }) => {
   const state = await authenticatedPage(page)
+  state.user.plan = 'pro'
   state.applications.push({ id_application: 'aa8dc2f2-6ff2-43d2-9e4f-5443200f6d4b', company_name: 'Novyata', job_title: 'Product Designer', status: 'Entretien', id_resume: state.resume.id_resume, id_job_analysis: state.jobAnalysis.id_job_analysis })
   await page.goto('/candidatures/aa8dc2f2-6ff2-43d2-9e4f-5443200f6d4b')
   await page.getByLabel('Type d’entretien').fill('Visio')
@@ -125,6 +213,7 @@ test('candidature : entretien, simulation, remerciement et timeline persistent',
   await page.getByLabel('Votre réponse').fill('Le produit et les missions correspondent à mon expérience réelle.')
   await page.getByRole('button', { name: 'Envoyer et question suivante' }).click()
   await expect(page.getByText('Comment collaborez-vous avec une équipe produit ?', { exact: true })).toBeVisible()
+  await expect(page.getByText('Précisez la situation, votre tâche, les actions et le résultat réel.').first()).toBeVisible()
   await page.getByRole('button', { name: 'Terminer la simulation' }).click()
   await page.getByRole('button', { name: 'Générer un remerciement' }).click()
   await expect(page.getByText('Merci pour notre échange.')).toBeVisible()

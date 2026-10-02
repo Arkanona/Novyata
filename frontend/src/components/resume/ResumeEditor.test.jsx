@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 
 vi.mock('../../services/resumeService', () => ({ updateResume: vi.fn(), createExperience: vi.fn(), updateExperience: vi.fn(), deleteExperience: vi.fn(), createEducation: vi.fn(), updateEducation: vi.fn(), deleteEducation: vi.fn(), createSkill: vi.fn(), updateSkill: vi.fn(), deleteSkill: vi.fn(), createLanguage: vi.fn(), updateLanguage: vi.fn(), deleteLanguage: vi.fn() }))
 
@@ -27,7 +28,7 @@ describe('ResumeEditor', () => {
     const onSaved = vi.fn()
     const updatedResume = { ...resume, first_name: 'Julie' }
     updateResume.mockResolvedValue({ resume: updatedResume })
-    render(<ResumeEditor resume={resume} onSaved={onSaved} />)
+    render(<MemoryRouter><ResumeEditor resume={resume} onSaved={onSaved} /></MemoryRouter>)
 
     fireEvent.change(screen.getByDisplayValue('Marie'), { target: { value: 'Julie' } })
     expect(screen.getByRole('heading', { name: 'Julie Laurent' })).toBeTruthy()
@@ -39,8 +40,8 @@ describe('ResumeEditor', () => {
   })
 
   it('uses the data of a newly loaded resume instead of retaining stale form values', () => {
-    const { rerender } = render(<ResumeEditor resume={resume} onSaved={vi.fn()} />)
-    rerender(<ResumeEditor resume={{ ...resume, first_name: 'Sonia', city: 'Lyon' }} onSaved={vi.fn()} />)
+    const { rerender } = render(<MemoryRouter><ResumeEditor resume={resume} onSaved={vi.fn()} /></MemoryRouter>)
+    rerender(<MemoryRouter><ResumeEditor resume={{ ...resume, first_name: 'Sonia', city: 'Lyon' }} onSaved={vi.fn()} /></MemoryRouter>)
 
     expect(screen.getByDisplayValue('Sonia')).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Sonia Laurent' })).toBeTruthy()

@@ -13,6 +13,7 @@ import jobAnalysesRouter from './routes/jobAnalyses.js'
 import resumesRouter from './routes/resumes.js'
 import usageRouter from './routes/usage.js'
 import savedAnswersRouter from './routes/savedAnswers.js'
+import activityRouter from './routes/activity.js'
 import { stripeWebhook } from './controllers/billingController.js'
 import { errorHandler, notFound } from './middleware/errorHandler.js'
 
@@ -70,6 +71,7 @@ app.get('/api/health', (req, res) => res.json({
   jwtConfigured: Boolean(process.env.JWT_SECRET),
 }))
 app.use('/api/v1/applications', applicationsRouter)
+app.use('/api/v1/activity', activityRouter)
 app.use('/api/v1/auth', authLimiter, authRouter)
 app.use('/api/v1/billing', billingRouter)
 app.use('/api/v1/cover-letters', coverLettersRouter)

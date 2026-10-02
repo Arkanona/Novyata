@@ -15,12 +15,12 @@ const otherUserId = '3f6070dc-e2c2-48e0-9089-a07155fbec2f'
 const analysisId = 'aa8dc2f2-6ff2-43d2-9e4f-5443200f6d4b'
 const resumeId = 'f8c5d2f2-6ff2-43d2-9e4f-5443200f6d4b'
 const analysis = { id_job_analysis: analysisId, id_resume: resumeId, company_name: 'CloudNova', job_title: 'Développeur Full-Stack', job_description: 'Offre test', analysis_result: { importantKeywords: ['React'] } }
-const resume = { id_resume: resumeId, title_resume: 'CV Développeur Full-Stack', job_title: 'Développeur Full-Stack', first_name: 'Marie', last_name: 'Laurent', email: 'marie@example.test', phone: '0600000000', city: 'Lyon', summary: 'Développeuse web.', template_key: 'modern', accent_color: '#3F6B5B', font_size: 'large' }
+const resume = { id_resume: resumeId, title_resume: 'CV Développeur Full-Stack', job_title: 'Développeur Full-Stack', first_name: 'Marie', last_name: 'Laurent', email: 'marie@example.test', phone: '0600000000', city: 'Lyon', summary: 'Développeuse web.', template_key: 'modern', accent_color: '#3F6B5B', font_size: 'large', font_family: 'Inter', content_density: 'normal', section_spacing: 'normal', heading_style: 'line', divider_style: 'solid', section_order: ['summary', 'experiences', 'educations', 'skills', 'languages'], plan: 'pro' }
 const experience = { job_title: 'Développeuse', company: 'Novyata', city: 'Lyon', start_date: '2024-01-01', end_date: null, is_current: true, description: 'Création de fonctionnalités React.' }
 const proposal = { id: 'experience-0', field: 'experience', targetIndex: 0, currentText: experience.description, proposedText: 'Création de fonctionnalités React pour des parcours produit.', reason: 'Précise un mot-clé cohérent.' }
 
-function sourceDatabase({ analysisRows = [analysis], resumeRows = [resume] } = {}) {
-  return { query: vi.fn().mockResolvedValueOnce({ rows: analysisRows }).mockResolvedValueOnce({ rows: resumeRows }).mockResolvedValueOnce({ rows: [experience] }).mockResolvedValueOnce({ rows: [{ degree: 'Master', school: 'École', city: 'Lyon', start_date: '2020-01-01', end_date: '2022-01-01', description: null }] }).mockResolvedValueOnce({ rows: [{ name: 'React', level: 'Avancé' }] }).mockResolvedValueOnce({ rows: [{ name: 'Anglais', level: 'B2' }] }) }
+function sourceDatabase({ analysisRows = [analysis], resumeRows = [resume], customSections = [] } = {}) {
+  return { query: vi.fn().mockResolvedValueOnce({ rows: analysisRows }).mockResolvedValueOnce({ rows: resumeRows }).mockResolvedValueOnce({ rows: [experience] }).mockResolvedValueOnce({ rows: [{ degree: 'Master', school: 'École', city: 'Lyon', start_date: '2020-01-01', end_date: '2022-01-01', description: null }] }).mockResolvedValueOnce({ rows: [{ name: 'React', level: 'Avancé' }] }).mockResolvedValueOnce({ rows: [{ name: 'Anglais', level: 'B2' }] }).mockResolvedValueOnce({ rows: customSections }) }
 }
 
 describe('cvAdaptationController', () => {
@@ -42,6 +42,14 @@ describe('cvAdaptationController', () => {
     expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 404, message: 'CV introuvable.' })
   })
 
+  it('requires Pro for CV adaptation even when the user has AI quota', async () => {
+    const database = sourceDatabase({ resumeRows: [{ ...resume, plan: 'free' }] }); requireDatabase.mockReturnValue(database)
+    const next = vi.fn()
+    await createAdaptationProposals({ auth: { sub: userId }, params: { id: analysisId } }, createResponse(), next)
+    expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 403, details: { upgrade: true, feature: 'cvAdaptation' } })
+    expect(proposeCvAdaptation).not.toHaveBeenCalled()
+  })
+
   it('keeps the original CV unchanged while requesting proposals', async () => {
     const database = sourceDatabase(); requireDatabase.mockReturnValue(database)
     proposeCvAdaptation.mockResolvedValue({ proposals: [proposal] })
@@ -60,15 +68,17 @@ describe('cvAdaptationController', () => {
   })
 
   it('copies the CV preferences and applies only accepted proposals', async () => {
-    const database = sourceDatabase()
+    const customSection = { section_type: 'projects', title: 'Projets', content: 'Projet produit.', display_order: 0 }
+    const database = sourceDatabase({ customSections: [customSection] })
     const client = { query: vi.fn().mockResolvedValueOnce({}).mockResolvedValueOnce({ rows: [{ id_resume: '3e2c3d2f-6ff2-43d2-9e4f-5443200f6d4b' }] }).mockResolvedValue({}), release: vi.fn() }
     database.connect = vi.fn().mockResolvedValue(client); requireDatabase.mockReturnValue(database)
     validateAdaptation.mockReturnValue({ proposals: [proposal, { id: 'summary-0', field: 'summary', targetIndex: 0, currentText: resume.summary, proposedText: 'Résumé non accepté.', reason: 'Test.' }] })
     const res = createResponse()
     await applyCvAdaptation({ auth: { sub: userId }, params: { id: analysisId }, body: { proposals: [proposal], acceptedIds: ['experience-0'] } }, res, vi.fn())
-    expect(client.query).toHaveBeenCalledWith(expect.stringMatching(/insert into resumes/i), expect.arrayContaining([userId, expect.stringContaining('CloudNova'), resume.template_key, resume.accent_color, resume.font_size]))
+    expect(client.query).toHaveBeenCalledWith(expect.stringMatching(/insert into resumes/i), expect.arrayContaining([userId, resume.id_resume, expect.stringContaining('CloudNova'), resume.template_key, resume.accent_color, resume.font_size]))
     expect(client.query).toHaveBeenCalledWith(expect.stringMatching(/insert into experiences/i), expect.arrayContaining([expect.any(String), experience.job_title, experience.company, experience.city, experience.start_date, experience.end_date, experience.is_current, proposal.proposedText]))
     expect(client.query).toHaveBeenCalledWith(expect.stringMatching(/insert into resumes/i), expect.arrayContaining([resume.summary]))
+    expect(client.query).toHaveBeenCalledWith(expect.stringMatching(/insert into resume_custom_sections/i), expect.arrayContaining([expect.any(String), customSection.section_type, customSection.title, customSection.content, customSection.display_order]))
     expect(res.status).toHaveBeenCalledWith(201)
     expect(client.query).toHaveBeenCalledWith('commit')
     expect(client.release).toHaveBeenCalled()

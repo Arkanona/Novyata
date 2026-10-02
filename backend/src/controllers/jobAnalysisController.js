@@ -3,6 +3,7 @@ import { analyzeJobDescription } from '../services/jobAnalysisService.js'
 import ApiError from '../utils/ApiError.js'
 import { AI_FEATURES } from '../config/plans.js'
 import { assertAiQuota, consumeAiQuota } from '../services/aiUsageService.js'
+import { presentAnalysisForPlan } from '../utils/analysisPresentation.js'
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const optionalText = (value, maxLength) => typeof value === 'string' ? value.trim().slice(0, maxLength) : ''
@@ -20,7 +21,8 @@ function logInsertPayload({ userId, resumeId, jobDescription, analysis, serializ
     matchScore: analysis?.matchScore,
     matchScoreType: typeof analysis?.matchScore,
     matchScoreIsInteger: Number.isInteger(analysis?.matchScore),
-    analysisResultType: typeof serializedAnalysis,
+    analysisResultType: typeof analysis,
+    analysisResultIsObject: Boolean(analysis) && typeof analysis === 'object' && !Array.isArray(analysis),
     analysisResultSerializable: serializable,
     jobDescriptionPresent: typeof jobDescription === 'string' && jobDescription.trim().length > 0,
   })
@@ -62,7 +64,7 @@ export async function analyzeJob(req, res, next) {
       database.query('select name, level from skills where id_resume = $1', [resumeId]),
       database.query('select name, level from languages where id_resume = $1', [resumeId]),
     ])
-    await assertAiQuota(database, req.auth.sub, AI_FEATURES.JOB_ANALYSIS)
+    const usage = await assertAiQuota(database, req.auth.sub, AI_FEATURES.JOB_ANALYSIS)
     const analysis = await analyzeJobDescription({ resume: { ...resume, experiences: experiences.rows, educations: educations.rows, skills: skills.rows, languages: languages.rows }, jobDescription })
     await consumeAiQuota(database, req.auth.sub, AI_FEATURES.JOB_ANALYSIS)
     const serializedAnalysis = JSON.stringify(analysis)
@@ -77,6 +79,6 @@ export async function analyzeJob(req, res, next) {
       logInsertError(error)
       throw error
     }
-    return res.status(201).json({ analysis: { ...analysis, id_job_analysis: saved.rows[0].id_job_analysis, created_at: saved.rows[0].created_at, updated_at: saved.rows[0].updated_at } })
+    return res.status(201).json({ analysis: { ...presentAnalysisForPlan(analysis, usage?.plan), id_job_analysis: saved.rows[0].id_job_analysis, created_at: saved.rows[0].created_at, updated_at: saved.rows[0].updated_at } })
   } catch (error) { return next(error) }
 }

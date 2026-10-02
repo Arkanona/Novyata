@@ -45,6 +45,25 @@ describe('resumeController', () => {
     expect(res.json.mock.calls[0][0].resume.id_resume).toBe(resume.id_resume)
   })
 
+  it('refuses to create a Pro template for a Free account', async () => {
+    const database = { query: vi.fn().mockResolvedValue({ rows: [{ plan: 'free' }] }) }
+    requireDatabase.mockReturnValue(database)
+    const next = vi.fn()
+    await createResume({ auth: { sub: userId }, body: { title_resume: 'CV', first_name: 'Marie', last_name: 'Laurent', job_title: 'Designer', template_key: 'corporate' } }, createResponse(), next)
+    expect(database.query).toHaveBeenCalledWith('select plan from users where id_user = $1', [userId])
+    expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 403, details: { upgrade: true } })
+    expect(database.query).toHaveBeenCalledTimes(1)
+  })
+
+  it('allows a Pro account to create a Pro template', async () => {
+    const database = { query: vi.fn().mockResolvedValueOnce({ rows: [{ plan: 'pro' }] }).mockResolvedValueOnce({ rows: [{ ...resume, template_key: 'corporate' }] }) }
+    requireDatabase.mockReturnValue(database)
+    const res = createResponse()
+    await createResume({ auth: { sub: userId }, body: { title_resume: 'CV', first_name: 'Marie', last_name: 'Laurent', job_title: 'Designer', template_key: 'corporate' } }, res, vi.fn())
+    expect(database.query.mock.calls[1][1]).toEqual([userId, 'CV', 'Marie', 'Laurent', 'Designer', 'corporate'])
+    expect(res.status).toHaveBeenCalledWith(201)
+  })
+
   it('passes resume creation database failures to the error handler', async () => {
     requireDatabase.mockReturnValue({ query: vi.fn().mockRejectedValue(new Error('database unavailable')) })
     const next = vi.fn()
@@ -79,14 +98,32 @@ describe('resumeController', () => {
     expect(database.query.mock.calls[0][1]).toEqual([resume.id_resume, userId])
   })
 
+  it('loads sibling variants from the original CV when viewing a variant', async () => {
+    const rootId = '4a8dc2f2-6ff2-43d2-9e4f-5443200f6d4b'
+    const variantId = '5a8dc2f2-6ff2-43d2-9e4f-5443200f6d4b'
+    const database = { query: vi.fn().mockResolvedValueOnce({ rows: [{ ...resume, id_resume: variantId, parent_resume_id: rootId }] }).mockResolvedValue({ rows: [] }) }
+    requireDatabase.mockReturnValue(database)
+    await getResume({ auth: { sub: userId }, params: { id: variantId } }, createResponse(), vi.fn())
+    expect(database.query.mock.calls[6][1]).toEqual([rootId, userId])
+  })
+
   it('updates personal information for an owned resume', async () => {
     const updatedResume = { ...resume, email: 'marie@example.com', phone: '0601020304', city: 'Paris', summary: 'Designer produit.', updated_at: '2026-02-01' }
     const database = { query: vi.fn().mockResolvedValue({ rows: [updatedResume] }) }
     requireDatabase.mockReturnValue(database)
     const res = createResponse()
     await updateResume({ auth: { sub: userId }, params: { id: resume.id_resume }, body: { first_name: ' Marie ', last_name: ' Laurent ', job_title: ' Product Designer ', email: ' MARIE@EXAMPLE.COM ', phone: ' 0601020304 ', city: ' Paris ', summary: ' Designer produit. ' } }, res, vi.fn())
-    expect(database.query.mock.calls[0][1]).toEqual(['Marie', 'Laurent', 'Product Designer', 'marie@example.com', '0601020304', 'Paris', 'Designer produit.', 'classic', '#314A67', 'normal', resume.id_resume, userId])
+    expect(database.query.mock.calls[0][1]).toEqual(['Marie', 'Laurent', 'Product Designer', 'marie@example.com', '0601020304', 'Paris', 'Designer produit.', 'classic', '#314A67', 'normal', 'Inter', 'normal', 'normal', 'line', 'solid', JSON.stringify(['summary', 'experiences', 'educations', 'skills', 'languages']), resume.id_resume, userId])
     expect(res.json.mock.calls[0][0].resume).toMatchObject({ email: 'marie@example.com', city: 'Paris', summary: 'Designer produit.', updated_at: '2026-02-01' })
+  })
+
+  it('prevents a Free user from activating a Pro template through the resume API', async () => {
+    const database = { query: vi.fn().mockResolvedValue({ rows: [{ plan: 'free' }] }) }
+    requireDatabase.mockReturnValue(database)
+    const next = vi.fn()
+    await updateResume({ auth: { sub: userId }, params: { id: resume.id_resume }, body: { first_name: 'Marie', last_name: 'Laurent', job_title: 'Designer', template_key: 'tech' } }, createResponse(), next)
+    expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 403, details: { template: 'tech' } })
+    expect(database.query).toHaveBeenCalledTimes(1)
   })
 
   it('returns 404 when the resume to update does not exist', async () => {

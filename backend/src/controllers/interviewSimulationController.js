@@ -1,5 +1,5 @@
 import { requireDatabase } from '../config/database.js'
-import { AI_FEATURES } from '../config/plans.js'
+import { AI_FEATURES, capabilitiesFor } from '../config/plans.js'
 import { assertAiQuota, consumeAiQuota } from '../services/aiUsageService.js'
 import { simulateInterview } from '../services/interviewSimulationService.js'
 import ApiError from '../utils/ApiError.js'
@@ -60,8 +60,9 @@ export async function createInterviewSimulation(req, res, next) {
       if (previous.rows[0].status === 'completed') throw new ApiError(409, 'Cette simulation est terminée. Démarrez-en une nouvelle.')
     }
 
-    await assertAiQuota(db, req.auth.sub, AI_FEATURES.INTERVIEW_SIMULATION)
-    const simulation = await simulateInterview({ ...await getSimulationContext(db, application, req.auth.sub), answer: answer || null })
+    const usage = await assertAiQuota(db, req.auth.sub, AI_FEATURES.INTERVIEW_SIMULATION)
+    const capabilities = capabilitiesFor(usage?.plan)
+    const simulation = await simulateInterview({ ...await getSimulationContext(db, application, req.auth.sub), answer: answer || null, tier: capabilities.advancedInterview ? 'pro' : 'free' })
     await consumeAiQuota(db, req.auth.sub, AI_FEATURES.INTERVIEW_SIMULATION)
 
     const exchanges = [...(previous?.rows[0]?.exchanges || []), {

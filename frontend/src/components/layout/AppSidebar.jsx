@@ -28,6 +28,7 @@ export default function AppSidebar({ isOpen = false, onNavigate = () => {} }) {
     <Logo />
     <nav className="sidebar-group" aria-label="Navigation principale">
       {navigation.map(({ to, icon: Icon, label }) => <NavLink key={to} to={to} onClick={onNavigate} className={({ isActive }) => isActive ? 'active' : ''}><Icon size={18} />{label}</NavLink>)}
+      <Link to={user?.plan === 'pro' ? '/historique' : '/tarifs'} onClick={onNavigate} className="sidebar-pro-history"><History size={18} />Historique complet<span>Pro</span></Link>
       <Link to="/" onClick={onNavigate}><House size={18} />Accueil</Link>
     </nav>
     <div className="sidebar-bottom">

@@ -39,6 +39,24 @@ create table if not exists resumes (
   template_key varchar(50) not null default 'classic',
   accent_color varchar(7) not null default '#314A67',
   font_size varchar(10) not null default 'normal',
+  parent_resume_id uuid references resumes(id_resume) on delete set null,
+  section_order jsonb not null default '["summary","experiences","educations","skills","languages"]'::jsonb,
+  font_family varchar(40) not null default 'Inter',
+  content_density varchar(20) not null default 'normal',
+  section_spacing varchar(20) not null default 'normal',
+  heading_style varchar(20) not null default 'line',
+  divider_style varchar(20) not null default 'solid',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists resume_custom_sections (
+  id_resume_section uuid primary key default gen_random_uuid(),
+  id_resume uuid not null references resumes(id_resume) on delete cascade,
+  section_type varchar(40) not null check (section_type in ('projects','certifications','volunteering','achievements','publications','portfolio','github','linkedin','interests')),
+  title varchar(120) not null,
+  content text not null,
+  display_order integer not null default 0 check (display_order >= 0),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -261,7 +279,14 @@ $$;
 alter table resumes
   add column if not exists template_key varchar(50) not null default 'classic',
   add column if not exists accent_color varchar(7) not null default '#314A67',
-  add column if not exists font_size varchar(10) not null default 'normal';
+  add column if not exists font_size varchar(10) not null default 'normal',
+  add column if not exists parent_resume_id uuid references resumes(id_resume) on delete set null,
+  add column if not exists section_order jsonb not null default '["summary","experiences","educations","skills","languages"]'::jsonb,
+  add column if not exists font_family varchar(40) not null default 'Inter',
+  add column if not exists content_density varchar(20) not null default 'normal',
+  add column if not exists section_spacing varchar(20) not null default 'normal',
+  add column if not exists heading_style varchar(20) not null default 'line',
+  add column if not exists divider_style varchar(20) not null default 'solid';
 
 alter table users
   add column if not exists plan varchar(20) not null default 'free',
@@ -309,6 +334,8 @@ alter table languages
 
 -- 3. Indexes.
 create index if not exists resumes_user_id_idx on resumes(id_user);
+create index if not exists resumes_parent_idx on resumes(parent_resume_id) where parent_resume_id is not null;
+create index if not exists resume_custom_sections_resume_order_idx on resume_custom_sections(id_resume, display_order, created_at);
 create index if not exists cover_letters_user_id_idx on cover_letters(id_user);
 create index if not exists cover_letters_resume_id_idx on cover_letters(id_resume);
 create index if not exists applications_user_id_idx on applications(id_user);
@@ -344,6 +371,8 @@ create trigger users_set_updated_at before update on users for each row execute 
 
 drop trigger if exists resumes_set_updated_at on resumes;
 create trigger resumes_set_updated_at before update on resumes for each row execute function set_updated_at();
+drop trigger if exists resume_custom_sections_set_updated_at on resume_custom_sections;
+create trigger resume_custom_sections_set_updated_at before update on resume_custom_sections for each row execute function set_updated_at();
 
 drop trigger if exists cover_letters_set_updated_at on cover_letters;
 create trigger cover_letters_set_updated_at before update on cover_letters for each row execute function set_updated_at();

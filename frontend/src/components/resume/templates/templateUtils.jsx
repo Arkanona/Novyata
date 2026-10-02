@@ -34,3 +34,14 @@ export function content(resume) {
 }
 
 export function SectionTitle({ children }) { return <h2 className="cv-section-title">{children}</h2> }
+
+const baseSectionOrder = ['summary', 'experiences', 'educations', 'skills', 'languages']
+export function orderedResumeSectionKeys(resume, availableKeys) {
+  const saved = Array.isArray(resume.section_order) ? resume.section_order : baseSectionOrder
+  return [...saved.filter((key) => availableKeys.includes(key)), ...availableKeys.filter((key) => !saved.includes(key))]
+}
+
+export function CustomTemplateSection({ item, className = '' }) {
+  if (!item?.title?.trim() || !item?.content?.trim()) return null
+  return <section className={`template-custom-section ${className}`} key={item.id_resume_section}><SectionTitle>{item.title}</SectionTitle><p>{item.content}</p></section>
+}

@@ -8,14 +8,14 @@ vi.mock('../src/services/applicationFollowupService.js', () => ({ generateFollow
 import { requireDatabase } from '../src/config/database.js'
 import { assertAiQuota, consumeAiQuota } from '../src/services/aiUsageService.js'
 import { generateFollowup } from '../src/services/applicationFollowupService.js'
-import { createThankYou, markFollowupSent } from '../src/controllers/applicationFollowupController.js'
+import { createFollowup, createThankYou, markFollowupSent } from '../src/controllers/applicationFollowupController.js'
 import { createInterview, updateInterview } from '../src/controllers/interviewController.js'
 
 const user = '8b74e3e1-64b4-46f1-bfd8-c50a174cf908'
 const application = '7b74e3e1-64b4-46f1-bfd8-c50a174cf908'
 const interview = '6b74e3e1-64b4-46f1-bfd8-c50a174cf908'
 const followup = '5b74e3e1-64b4-46f1-bfd8-c50a174cf908'
-const ownedApplication = { id_application: application, company_name: 'Novyata', job_title: 'Product designer', status: 'Entretien' }
+const ownedApplication = { id_application: application, company_name: 'Novyata', job_title: 'Product designer', status: 'Entretien', plan: 'pro' }
 
 describe('application lifecycle controllers', () => {
   beforeEach(() => {
@@ -61,6 +61,37 @@ describe('application lifecycle controllers', () => {
     await createThankYou({ params: { id: application }, auth: { sub: user } }, createResponse(), next)
     expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 400 })
     expect(generateFollowup).not.toHaveBeenCalled()
+  })
+
+  it('keeps advanced follow-up types unavailable to Free while allowing the basic first follow-up', async () => {
+    const query = vi.fn().mockResolvedValueOnce({ rows: [{ ...ownedApplication, plan: 'free' }] })
+    requireDatabase.mockReturnValue({ query })
+    const next = vi.fn()
+    await createFollowup({ params: { id: application }, auth: { sub: user }, body: { type: 'Deuxième relance' } }, createResponse(), next)
+    expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 403, details: { upgrade: true, feature: 'advancedFollowups' } })
+    expect(generateFollowup).not.toHaveBeenCalled()
+    expect(query).toHaveBeenCalledTimes(1)
+  })
+
+  it('permits a Pro second follow-up and persists it as a user-reviewed draft', async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce({ rows: [ownedApplication] })
+      .mockResolvedValueOnce({ rows: [{ id_followup: followup, type: 'Deuxième relance', content: 'Merci de considérer ma candidature. Je reste disponible.' }] })
+    requireDatabase.mockReturnValue({ query })
+    const res = createResponse()
+    await createFollowup({ params: { id: application }, auth: { sub: user }, body: { type: 'Deuxième relance' } }, res, vi.fn())
+    expect(generateFollowup).toHaveBeenCalledWith(expect.objectContaining({ type: 'Deuxième relance', company: 'Novyata' }))
+    expect(res.status).toHaveBeenCalledWith(201)
+  })
+
+  it('keeps after-interview thank-you generation Pro-only', async () => {
+    const query = vi.fn().mockResolvedValueOnce({ rows: [{ ...ownedApplication, plan: 'free' }] })
+    requireDatabase.mockReturnValue({ query })
+    const next = vi.fn()
+    await createThankYou({ params: { id: application }, auth: { sub: user } }, createResponse(), next)
+    expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 403, details: { feature: 'advancedFollowups' } })
+    expect(generateFollowup).not.toHaveBeenCalled()
+    expect(query).toHaveBeenCalledTimes(1)
   })
 
   it('generates and persists a thank-you draft using the report only', async () => {

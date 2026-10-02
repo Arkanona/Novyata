@@ -3,11 +3,17 @@ import authenticate from '../middleware/authMiddleware.js'
 import { createResume, deleteResume, getResume, listResumes, updateResume } from '../controllers/resumeController.js'
 import { createEducation, createExperience, deleteEducation, deleteExperience, updateEducation, updateExperience } from '../controllers/resumeSectionController.js'
 import { createLanguage, createSkill, deleteLanguage, deleteSkill, updateLanguage, updateSkill } from '../controllers/resumeTagController.js'
+import { createCustomSection, createResumeVariant, deleteCustomSection, reorderResumeSections, updateCustomSection } from '../controllers/resumeProController.js'
 
 const router = Router()
 router.use(authenticate)
 router.get('/', listResumes)
 router.post('/', createResume)
+router.post('/:id/variants', createResumeVariant)
+router.post('/:id/sections', createCustomSection)
+router.patch('/:id/sections/:sectionId', updateCustomSection)
+router.delete('/:id/sections/:sectionId', deleteCustomSection)
+router.put('/:id/section-order', reorderResumeSections)
 router.post('/:id/experiences', createExperience)
 router.patch('/:id/experiences/:experienceId', updateExperience)
 router.delete('/:id/experiences/:experienceId', deleteExperience)

@@ -6,6 +6,23 @@ import PricingPreview from '../components/home/PricingPreview'
 import PublicSeo from '../components/home/PublicSeo'
 import { useAuth } from '../store/AuthContext'
 
-const comparisons = [['Création de CV et modèles', 'Oui', 'Oui'], ['Export PDF', 'Oui', 'Oui'], ['Lettres de motivation manuelles', 'Oui', 'Oui'], ['Suivi des candidatures', 'Oui', 'Oui'], ['Analyses d’offres', '5 / mois', '50 / mois'], ['Lettres IA', '3 / mois', '30 / mois'], ['Adaptations de CV', '3 / mois', '30 / mois'], ['Historique des analyses', 'Oui', 'Oui']]
+const comparisons = [
+  ['Templates de CV', '3 modèles Free', '9 modèles dont 6 Pro'],
+  ['Export PDF', 'Oui', 'Oui'],
+  ['Sections CV avancées', '—', 'Oui'],
+  ['Réorganisation des sections', '—', 'Oui'],
+  ['Personnalisation avancée', '—', 'Oui'],
+  ['Variantes indépendantes de CV', '—', 'Oui'],
+  ['Lettres manuelles et candidatures', 'Oui', 'Oui'],
+  ['Analyses d’offres', '5 / mois', '50 / mois'],
+  ['Analyse ATS détaillée', 'Analyse standard', 'Correspondances et conseils approfondis'],
+  ['Lettres IA', '3 / mois', '30 / mois'],
+  ['Adaptations du CV à une offre', 'Pro uniquement', '30 / mois'],
+  ['Relances IA et remerciements', '3 relances simples / mois', '30 / mois, types avancés inclus'],
+  ['Préparations d’entretien', '3 / mois', '30 / mois'],
+  ['Questions de simulation', '5 / mois', '60 / mois + coaching STAR'],
+  ['Historique complet', '—', 'Oui'],
+  ['Statistiques avancées', '—', 'Oui'],
+]
 const faq = [['Puis-je utiliser Novyata gratuitement ?', 'Oui. Le plan Free permet de créer, exporter et organiser vos documents, avec des usages IA mensuels inclus.'], ['Puis-je arrêter Pro quand je veux ?', 'Oui. La gestion et l’annulation de l’abonnement passent par le portail Stripe.'], ['Mes CV restent-ils accessibles ?', 'Oui. Vos CV, lettres et candidatures restent accessibles depuis votre espace.'], ['Mes quotas se réinitialisent-ils ?', 'Oui, les quotas IA sont remis à zéro au début de chaque mois.'], ['Le paiement est-il sécurisé ?', 'Oui. Le paiement et la gestion de l’abonnement sont traités par Stripe.']]
 export default function PricingPage() { const { isAuthenticated, user } = useAuth(); const navigate = useNavigate(); const isPro = user?.plan === 'pro'; return <main className="public-page pricing-page-v2"><PublicSeo title="Tarifs Novyata — Free et Pro" description="Découvrez les plans Free et Pro de Novyata pour créer et adapter vos candidatures." /><HomeHeader /><section className="public-hero page-width"><p className="home-eyebrow"><span /> Tarifs Novyata</p><h1>Un plan simple pour avancer à votre rythme.</h1><p>Commencez gratuitement. Passez à Pro lorsque vous avez besoin de préparer davantage de candidatures personnalisées.</p><Link className="button button--primary" to={isAuthenticated ? '/dashboard' : '/inscription'}>Créer mon CV gratuitement <ArrowRight size={16} /></Link></section><PricingPreview full /><section className="comparison-section page-width"><header><p className="home-eyebrow"><span /> Comparatif</p><h2>Ce dont vous avez besoin, sans complexité.</h2></header><div className="comparison-table" role="table" aria-label="Comparatif des plans"><div role="row" className="comparison-head"><b role="columnheader">Fonction</b><b role="columnheader">Free</b><b role="columnheader">Pro</b></div>{comparisons.map(([feature, free, pro]) => <div role="row" key={feature}><span role="cell">{feature}</span><span role="cell">{free === 'Oui' ? <Check aria-label="Inclus" size={17} /> : free}</span><span role="cell">{pro === 'Oui' ? <Check aria-label="Inclus" size={17} /> : pro}</span></div>)}</div>{isPro ? <div className="pricing-current-actions"><strong>Plan actuel : Novyata Pro</strong><button type="button" className="button button--primary" onClick={() => navigate('/parametres')}>Gérer mon abonnement</button></div> : <button type="button" className="button button--primary" onClick={() => navigate(isAuthenticated ? '/parametres' : '/inscription')}>Passer à Pro</button>}</section><section className="faq-section page-width"><p className="home-eyebrow"><span /> Questions fréquentes</p><h2>Une offre claire, sans surprise.</h2><div>{faq.map(([question, answer]) => <details key={question}><summary>{question}</summary><p>{answer}</p></details>)}</div></section><HomeFooter /></main> }

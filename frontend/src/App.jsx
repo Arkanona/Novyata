@@ -23,6 +23,7 @@ const JobAnalysisListPage = lazy(() => import('./pages/JobAnalysisListPage'))
 const ResumeEditorPage = lazy(() => import('./pages/ResumeEditorPage'))
 const ResumeListPage = lazy(() => import('./pages/ResumeListPage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
+const SavedAnswersPage = lazy(() => import('./pages/SavedAnswersPage'))
 
 function PageFallback() {
   return <main className="route-loading" role="status" aria-live="polite">Chargement de votre espace…</main>
@@ -63,6 +64,7 @@ export default function App() {
       <Route path="/analyses" element={lazyPage(JobAnalysisListPage)} />
       <Route path="/analyses/:id" element={lazyPage(JobAnalysisDetailPage)} />
       <Route path="/parametres" element={lazyPage(SettingsPage)} />
+      <Route path="/reponses" element={lazyPage(SavedAnswersPage)} />
     </Route></Route>
     <Route path="*" element={<NotFoundPage />} />
   </Routes></AuthProvider></BrowserRouter>

@@ -15,7 +15,12 @@ async function userForBilling(database, userId) {
 }
 
 export async function checkout(req, res, next) {
-  try { const user = await userForBilling(requireDatabase(), req.auth.sub); const session = await createProCheckout(user); return res.json({ url: session.url }) } catch (error) { return next(error) }
+  try {
+    const user = await userForBilling(requireDatabase(), req.auth.sub)
+    if (user.plan === 'pro' || activeStatuses.has(user.subscription_status)) throw new ApiError(409, 'Votre compte possède déjà un abonnement Pro. Gérez-le depuis les paramètres.')
+    const session = await createProCheckout(user)
+    return res.json({ url: session.url })
+  } catch (error) { return next(error) }
 }
 export async function portal(req, res, next) {
   try { const user = await userForBilling(requireDatabase(), req.auth.sub); const session = await createCustomerPortal(user.stripe_customer_id); return res.json({ url: session.url }) } catch (error) { return next(error) }

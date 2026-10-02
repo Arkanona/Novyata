@@ -131,6 +131,7 @@ create table if not exists interview_sessions (
   id_interview_session uuid primary key default gen_random_uuid(),
   id_application uuid not null references applications(id_application) on delete cascade,
   id_user uuid not null references users(id_user) on delete cascade,
+  status varchar(20) not null default 'in_progress' check (status in ('in_progress', 'completed')),
   exchanges jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -275,6 +276,12 @@ alter table users
   add column if not exists password_reset_expires_at timestamptz;
 
 alter table users add column if not exists job_search_preferences jsonb not null default '{}'::jsonb;
+alter table interview_sessions add column if not exists status varchar(20) not null default 'in_progress';
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'interview_sessions_status_check') then
+    alter table interview_sessions add constraint interview_sessions_status_check check (status in ('in_progress', 'completed'));
+  end if;
+end $$;
 alter table applications add column if not exists id_job_analysis uuid;
 do $$ begin
   if not exists (select 1 from pg_constraint where conname = 'applications_job_analysis_fk') then

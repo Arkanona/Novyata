@@ -29,6 +29,7 @@ export function getCurrentUser(token) {
 }
 function authenticated(path, method, payload) { return request(path, { method, headers: { Authorization: 'Bearer ' + localStorage.getItem('novyata_auth_token') }, ...(payload ? { body: JSON.stringify(payload) } : {}) }) }
 export const updateProfile = (payload) => authenticated('/api/v1/auth/me', 'PATCH', payload)
+export const updateSearchPreferences = (payload) => authenticated('/api/v1/auth/me/search-preferences', 'PATCH', payload)
 export const changePassword = (payload) => authenticated('/api/v1/auth/me/password', 'PATCH', payload)
 export const deleteAccount = () => authenticated('/api/v1/auth/me', 'DELETE')
 export const resendVerification = () => authenticated('/api/v1/auth/me/resend-verification', 'POST')

@@ -62,6 +62,8 @@ describe('jobAnalysisController', () => {
     expect(res.json).toHaveBeenCalledWith({ analysis: expect.objectContaining({ ...validAnalysis, id_job_analysis: 'aa8dc2f2-6ff2-43d2-9e4f-5443200f6d4b' }) })
     expect(database.query.mock.calls).toHaveLength(6)
     expect(database.query.mock.calls[5][0]).toMatch(/insert into job_analyses/i)
+    expect(database.query.mock.calls[5][1]).toEqual([userId, resumeId, null, 'Designer', body.jobDescription, 72, JSON.stringify(validAnalysis)])
+    expect(JSON.parse(database.query.mock.calls[5][1][6])).toEqual(validAnalysis)
   })
 
   it('does not save an analysis when OpenAI fails', async () => {

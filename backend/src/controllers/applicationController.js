@@ -143,19 +143,20 @@ export async function getApplicationDossier(req, res, next) {
     const database = requireDatabase()
     const result = await database.query(`select ${fields} from applications where id_application = $1 and id_user = $2`, [req.params.id, req.auth.sub])
     if (!result.rows[0]) throw new ApiError(404, 'Candidature introuvable.')
-    const [events, followups, interviews] = await Promise.all([
+    const [events, followups, interviews, interviewSessions] = await Promise.all([
       database.query('select id_application_event, type, title, description, event_date, metadata, created_at from application_events where id_application = $1 order by event_date desc, created_at desc', [req.params.id]),
       database.query('select id_followup, type, content, sent_at, created_at, updated_at from application_followups where id_application = $1 order by created_at desc', [req.params.id]),
       database.query('select id_interview, interview_date, interview_type, people_met, feeling, questions_asked, key_points, next_steps, notes, created_at from interviews where id_application = $1 order by interview_date desc nulls last, created_at desc', [req.params.id]),
+      database.query('select id_interview_session, status, exchanges, jsonb_array_length(exchanges) as progress, created_at, updated_at from interview_sessions where id_application = $1 and id_user = $2 order by updated_at desc', [req.params.id, req.auth.sub]),
     ])
     const application = serializeApplication(result.rows[0])
     const checklist = [
-      ['cv', 'CV sélectionné', Boolean(application.id_resume)], ['contact', 'Coordonnées de contact renseignées', Boolean(application.contact_email || application.contact_name)], ['analysis', 'Offre analysée', Boolean(application.id_job_analysis)], ['letter', 'Lettre prête', Boolean(application.id_cover_letter)], ['required', 'Informations essentielles complétées', Boolean(application.company_name && application.job_title)],
+      ['cv', 'CV sélectionné', Boolean(application.id_resume)], ['contact', 'Coordonnées de contact renseignées', Boolean(application.contact_email || application.contact_name)], ['analysis', 'Offre analysée', Boolean(application.id_job_analysis)], ['adapted_cv', 'CV adapté ou vérifié pour l’offre', Boolean(application.id_resume && application.id_job_analysis)], ['letter', 'Lettre prête', Boolean(application.id_cover_letter)], ['required', 'Informations essentielles complétées', Boolean(application.company_name && application.job_title)],
     ]
     const applicationDate = application.application_date ? new Date(application.application_date) : null
     const elapsedDays = applicationDate ? Math.floor((Date.now() - applicationDate.getTime()) / 86_400_000) : 0
     const followupSuggestion = { suggested: application.status === 'Candidature envoyée' && !followups.rows.some((followup) => followup.sent_at) && elapsedDays >= FOLLOWUP_SUGGESTION_DAYS, days: FOLLOWUP_SUGGESTION_DAYS }
-    return res.json({ application, events: events.rows, followups: followups.rows, interviews: interviews.rows, checklist: checklist.map(([id, label, done]) => ({ id, label, done, required: id === 'required' })), followupSuggestion })
+    return res.json({ application, events: events.rows, followups: followups.rows, interviews: interviews.rows, interview_sessions: interviewSessions.rows, checklist: checklist.map(([id, label, done]) => ({ id, label, done, required: id === 'required' })), followupSuggestion })
   } catch (error) { return next(error) }
 }
 

@@ -26,5 +26,7 @@ export const createThankYouMessage = (id) => request('/api/v1/applications/' + i
 export const markApplicationFollowupSent = (id, followupId) => request('/api/v1/applications/' + id + '/followups/' + followupId + '/sent', { method: 'PATCH' })
 export const updateApplicationFollowup = (id, followupId, payload) => request('/api/v1/applications/' + id + '/followups/' + followupId, { method: 'PATCH', body: JSON.stringify(payload) })
 export const createApplicationInterview = (id, payload) => request('/api/v1/applications/' + id + '/interviews', { method: 'POST', body: JSON.stringify(payload) })
+export const updateApplicationInterview = (id, interviewId, payload) => request('/api/v1/applications/' + id + '/interviews/' + interviewId, { method: 'PATCH', body: JSON.stringify(payload) })
 export const createInterviewPreparation = (id) => request('/api/v1/applications/' + id + '/interview-preparation', { method: 'POST' })
 export const createInterviewSimulation = (id, payload) => request('/api/v1/applications/' + id + '/interview-simulation', { method: 'POST', body: JSON.stringify(payload) })
+export const completeInterviewSimulation = (id, sessionId) => request('/api/v1/applications/' + id + '/interview-simulations/' + sessionId + '/complete', { method: 'PATCH' })

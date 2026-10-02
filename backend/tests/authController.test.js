@@ -8,7 +8,7 @@ vi.mock('../src/config/database.js', () => ({ requireDatabase: vi.fn() }))
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import { requireDatabase } from '../src/config/database.js'
-import { changePassword, deleteAccount, login, me, register, updateProfile } from '../src/controllers/authController.js'
+import { changePassword, deleteAccount, login, me, register, updateProfile, updateSearchPreferences } from '../src/controllers/authController.js'
 
 const user = { id_user: '8b74e3e1-64b4-46f1-bfd8-c50a174cf908', first_name: 'Marie', last_name: 'Laurent', email: 'marie@example.com', password: 'hash', created_at: '2026-01-01' }
 
@@ -17,6 +17,15 @@ describe('authController', () => {
     vi.clearAllMocks()
     process.env.JWT_SECRET = 'test-secret'
     process.env.JWT_EXPIRES_IN = '7d'
+  })
+
+  it('stores only valid, trimmed search preferences for the authenticated user', async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ ...user, job_search_preferences: { roles: 'Product designer', remote_work: 'Hybride' } }] })
+    requireDatabase.mockReturnValue({ query })
+    const res = createResponse(); const next = vi.fn()
+    await updateSearchPreferences({ auth: { sub: user.id_user }, body: { roles: ' Product designer ', remote_work: 'Hybride', ignored: 'value' } }, res, next)
+    expect(next).not.toHaveBeenCalled(); expect(query).toHaveBeenCalledWith(expect.stringContaining('job_search_preferences'), [JSON.stringify({ roles: 'Product designer', remote_work: 'Hybride' }), user.id_user])
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ user: expect.objectContaining({ job_search_preferences: { roles: 'Product designer', remote_work: 'Hybride' } }) }))
   })
 
   it('refuses an invalid registration before querying the database', async () => {

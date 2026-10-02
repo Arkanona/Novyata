@@ -8,10 +8,10 @@ const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}
 const optionalText = (value, maxLength) => typeof value === 'string' ? value.trim().slice(0, maxLength) : ''
 const isDevelopment = () => process.env.NODE_ENV !== 'production'
 
-function logInsertPayload({ userId, resumeId, jobDescription, analysis }) {
+function logInsertPayload({ userId, resumeId, jobDescription, analysis, serializedAnalysis }) {
   if (!isDevelopment()) return
   let serializable = false
-  try { serializable = typeof JSON.stringify(analysis) === 'string' } catch { /* Logged as false. */ }
+  try { serializable = typeof serializedAnalysis === 'string' && JSON.stringify(JSON.parse(serializedAnalysis)) === serializedAnalysis } catch { /* Logged as false. */ }
   console.info('Job analysis INSERT payload:', {
     idUserType: typeof userId,
     idUserIsUuid: uuidPattern.test(userId || ''),
@@ -20,7 +20,7 @@ function logInsertPayload({ userId, resumeId, jobDescription, analysis }) {
     matchScore: analysis?.matchScore,
     matchScoreType: typeof analysis?.matchScore,
     matchScoreIsInteger: Number.isInteger(analysis?.matchScore),
-    analysisResultType: typeof analysis,
+    analysisResultType: typeof serializedAnalysis,
     analysisResultSerializable: serializable,
     jobDescriptionPresent: typeof jobDescription === 'string' && jobDescription.trim().length > 0,
   })
@@ -66,7 +66,7 @@ export async function analyzeJob(req, res, next) {
     const analysis = await analyzeJobDescription({ resume: { ...resume, experiences: experiences.rows, educations: educations.rows, skills: skills.rows, languages: languages.rows }, jobDescription })
     await consumeAiQuota(database, req.auth.sub, AI_FEATURES.JOB_ANALYSIS)
     const serializedAnalysis = JSON.stringify(analysis)
-    logInsertPayload({ userId: req.auth.sub, resumeId, jobDescription, analysis })
+    logInsertPayload({ userId: req.auth.sub, resumeId, jobDescription, analysis, serializedAnalysis })
     let saved
     try {
       saved = await database.query(

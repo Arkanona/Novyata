@@ -17,6 +17,13 @@ describe('API routes', () => {
     expect(response.body.error.message).toBe('Authentification requise.')
   })
 
+  it('protects both billing endpoints when no user is authenticated', async () => {
+    const checkout = await request(app).post('/api/v1/billing/checkout')
+    const portal = await request(app).post('/api/v1/billing/portal')
+    expect(checkout.status).toBe(401)
+    expect(portal.status).toBe(401)
+  })
+
   it('exposes the current-user endpoint and protects it without a token', async () => {
     const response = await request(app).get('/api/v1/auth/me')
     expect(response.status).toBe(401)

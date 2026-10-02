@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, FileText, History, House, LayoutDashboard, LogOut, Mail, ScanSearch, Settings } from 'lucide-react'
+import { BriefcaseBusiness, FileText, History, House, LayoutDashboard, LogOut, Mail, MessageSquareText, ScanSearch, Settings } from 'lucide-react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import Logo from '../common/Logo'
 import { useAuth } from '../../store/AuthContext'
@@ -10,6 +10,7 @@ const navigation = [
   { to: '/candidatures', icon: BriefcaseBusiness, label: 'Candidatures' },
   { to: '/analyse-offre', icon: ScanSearch, label: 'Analyse d’offre' },
   { to: '/analyses', icon: History, label: 'Mes analyses' },
+  { to: '/reponses', icon: MessageSquareText, label: 'Mes réponses' },
 ]
 
 export default function AppSidebar({ isOpen = false, onNavigate = () => {} }) {

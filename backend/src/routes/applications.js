@@ -4,7 +4,7 @@ import { addApplicationNote, createApplication, deleteApplication, getApplicatio
 import { createFollowup, createThankYou, markFollowupSent, updateFollowup } from '../controllers/applicationFollowupController.js'
 import { createInterview, updateInterview } from '../controllers/interviewController.js'
 import { createInterviewPreparation } from '../controllers/interviewPreparationController.js'
-import { createInterviewSimulation } from '../controllers/interviewSimulationController.js'
+import { completeInterviewSimulation, createInterviewSimulation } from '../controllers/interviewSimulationController.js'
 
 const router = Router()
 
@@ -21,6 +21,7 @@ router.patch('/:id/followups/:followupId/sent', markFollowupSent)
 router.post('/:id/interviews', createInterview)
 router.post('/:id/interview-preparation', createInterviewPreparation)
 router.post('/:id/interview-simulation', createInterviewSimulation)
+router.patch('/:id/interview-simulations/:sessionId/complete', completeInterviewSimulation)
 router.patch('/:id/interviews/:interviewId', updateInterview)
 router.patch('/:id', updateApplication)
 router.delete('/:id', deleteApplication)

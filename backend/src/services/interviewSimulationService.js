@@ -13,8 +13,8 @@ export async function simulateInterview(context) {
   const isPro = context?.tier === 'pro'
   if (!process.env.OPENAI_API_KEY) throw new ApiError(503, 'Le service IA n’est pas configuré.')
   const instructions = isPro
-    ? 'Simule un entretien complet en français et personnalise chaque question uniquement selon le CV et l’offre fournis. Pose une seule question par tour. Quand une réponse est fournie, donne un retour détaillé, concret et bienveillant : points forts, point à compléter, suggestion d’amélioration et conseil STAR (situation, tâche, actions, résultat). Ne fabrique aucun détail ni résultat absent de la réponse du candidat ; indique explicitement les parties STAR qui restent à préciser. Au premier tour sans réponse, laisse le conseil STAR vide et invite le candidat à répondre. Réponds uniquement au JSON demandé.'
-    : 'Simule un entretien en français à partir du poste et du CV résumés. Pose une seule question réaliste puis, si une réponse est fournie, donne un retour court. N’invente aucun fait sur le candidat. Réponds uniquement au JSON demandé.'
+    ? 'Simule en français, une question par tour, selon CV/offre et préférences de recherche (souhaits, pas des faits). Après réponse : forces, point à compléter, conseil bref et conseil STAR. N’invente aucun fait ni résultat ; indique les éléments STAR à préciser. Premier tour : pas de feedback, invite à répondre. JSON seulement.'
+    : 'Simule en français depuis le poste, CV et préférences (souhaits, pas faits). Une question réaliste par tour, feedback bref après réponse. N’invente aucun fait. JSON seulement.'
   let response
   try {
     response = await fetch('https://api.openai.com/v1/responses', {

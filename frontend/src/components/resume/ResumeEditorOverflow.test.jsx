@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
-vi.mock('../../services/resumeService', () => ({ updateResume: vi.fn(), createExperience: vi.fn(), updateExperience: vi.fn(), deleteExperience: vi.fn(), createEducation: vi.fn(), updateEducation: vi.fn(), deleteEducation: vi.fn(), createSkill: vi.fn(), updateSkill: vi.fn(), deleteSkill: vi.fn(), createLanguage: vi.fn(), updateLanguage: vi.fn(), deleteLanguage: vi.fn() }))
+vi.mock('../../services/resumeService', () => ({ updateResume: vi.fn(), generateResumeSummary: vi.fn(), improveResumeSummary: vi.fn(), createExperience: vi.fn(), updateExperience: vi.fn(), deleteExperience: vi.fn(), createEducation: vi.fn(), updateEducation: vi.fn(), deleteEducation: vi.fn(), createSkill: vi.fn(), updateSkill: vi.fn(), deleteSkill: vi.fn(), createLanguage: vi.fn(), updateLanguage: vi.fn(), deleteLanguage: vi.fn() }))
 vi.mock('./ResumePreview', () => ({ default: ({ onOverflowChange }) => { queueMicrotask(() => onOverflowChange(true)); return <div>Aperçu A4</div> } }))
 
 import ResumeEditor, { RESUME_OVERFLOW_WARNING } from './ResumeEditor'

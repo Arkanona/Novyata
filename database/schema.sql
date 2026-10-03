@@ -61,6 +61,53 @@ create table if not exists resume_custom_sections (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists resume_versions (
+  id_resume_version uuid primary key default gen_random_uuid(),
+  id_resume uuid not null references resumes(id_resume) on delete cascade,
+  id_user uuid not null references users(id_user) on delete cascade,
+  version_label varchar(160) not null,
+  reason varchar(160) not null,
+  snapshot jsonb not null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public_profiles (
+  id_public_profile uuid primary key default gen_random_uuid(),
+  id_user uuid not null unique references users(id_user) on delete cascade,
+  id_resume uuid references resumes(id_resume) on delete set null,
+  slug varchar(60) not null unique,
+  is_published boolean not null default false,
+  visible_sections jsonb not null default '{"name":false,"job_title":false,"summary":false,"experiences":false,"educations":false,"skills":false,"languages":false,"custom_sections":false}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint public_profiles_slug_format check (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+  constraint public_profiles_sections_object check (jsonb_typeof(visible_sections) = 'object')
+);
+
+create table if not exists resume_share_links (
+  id_resume_share_link uuid primary key default gen_random_uuid(),
+  id_user uuid not null references users(id_user) on delete cascade,
+  id_resume uuid not null references resumes(id_resume) on delete cascade,
+  token_hash varchar(64) not null unique,
+  include_contact_details boolean not null default false,
+  expires_at timestamptz,
+  revoked_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists weekly_goals (
+  id_weekly_goal uuid primary key default gen_random_uuid(),
+  id_user uuid not null references users(id_user) on delete cascade,
+  week_start date not null,
+  is_enabled boolean not null default false,
+  target_applications smallint not null default 5 check (target_applications between 1 and 50),
+  target_followups smallint not null default 2 check (target_followups between 1 and 50),
+  target_interviews smallint not null default 1 check (target_interviews between 1 and 50),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint weekly_goals_user_week_unique unique (id_user,week_start)
+);
+
 create table if not exists cover_letters (
   id_cover_letter uuid primary key default gen_random_uuid(),
   id_user uuid not null references users(id_user) on delete cascade,
@@ -155,6 +202,23 @@ create table if not exists interview_sessions (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists notifications (
+  id_notification uuid primary key default gen_random_uuid(),
+  id_user uuid not null references users(id_user) on delete cascade,
+  id_application uuid not null references applications(id_application) on delete cascade,
+  type varchar(40) not null,
+  title varchar(160) not null,
+  body varchar(500) not null,
+  dedupe_key varchar(220) not null,
+  scheduled_for timestamptz not null,
+  is_read boolean not null default false,
+  archived_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint notifications_type_check check (type in ('interview_soon', 'no_response', 'next_action')),
+  constraint notifications_user_dedupe_unique unique (id_user, dedupe_key)
+);
+
 create table if not exists job_analyses (
   id_job_analysis uuid primary key default gen_random_uuid(),
   id_user uuid not null references users(id_user) on delete cascade,
@@ -177,6 +241,17 @@ create table if not exists ai_usage (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint ai_usage_user_feature_period_unique unique (id_user, feature, period)
+);
+
+create table if not exists resume_import_usage (
+  id_resume_import_usage uuid primary key default gen_random_uuid(),
+  id_user uuid not null references users(id_user) on delete cascade,
+  period varchar(7) not null,
+  import_count integer not null default 0 check (import_count >= 0),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint resume_import_usage_user_period_unique unique (id_user, period),
+  constraint resume_import_usage_period_check check (period ~ '^[0-9]{4}-(0[1-9]|1[0-2])$')
 );
 
 create table if not exists stripe_webhook_events (
@@ -231,6 +306,9 @@ create table if not exists languages (
 );
 
 -- 2. Compatibility migrations for databases created with an earlier MVP schema.
+alter table notifications drop constraint if exists notifications_type_check;
+alter table notifications add constraint notifications_type_check check (type in ('interview_soon', 'no_response', 'next_action'));
+
 do $$
 begin
   if exists (select 1 from information_schema.columns where table_name = 'experiences' and column_name = 'id')
@@ -335,6 +413,11 @@ alter table languages
 -- 3. Indexes.
 create index if not exists resumes_user_id_idx on resumes(id_user);
 create index if not exists resumes_parent_idx on resumes(parent_resume_id) where parent_resume_id is not null;
+create index if not exists resume_versions_resume_created_idx on resume_versions(id_resume, created_at desc);
+create index if not exists resume_versions_user_idx on resume_versions(id_user, created_at desc);
+create index if not exists public_profiles_published_slug_idx on public_profiles(slug) where is_published = true;
+create index if not exists resume_share_links_active_idx on resume_share_links(id_user,id_resume,created_at desc) where revoked_at is null;
+create index if not exists weekly_goals_user_week_idx on weekly_goals(id_user,week_start desc);
 create index if not exists resume_custom_sections_resume_order_idx on resume_custom_sections(id_resume, display_order, created_at);
 create index if not exists cover_letters_user_id_idx on cover_letters(id_user);
 create index if not exists cover_letters_resume_id_idx on cover_letters(id_resume);
@@ -345,6 +428,7 @@ create index if not exists application_followups_application_idx on application_
 create index if not exists interviews_application_idx on interviews(id_application);
 create index if not exists saved_answers_user_idx on saved_answers(id_user);
 create index if not exists interview_sessions_application_idx on interview_sessions(id_application, updated_at desc);
+create index if not exists notifications_user_active_idx on notifications(id_user, is_read, scheduled_for desc) where archived_at is null;
 create index if not exists job_analyses_user_id_idx on job_analyses(id_user);
 create index if not exists job_analyses_resume_id_idx on job_analyses(id_resume);
 create index if not exists experiences_resume_id_idx on experiences(id_resume);
@@ -366,11 +450,111 @@ begin
 end;
 $$;
 
+create or replace function build_resume_snapshot(p_resume_id uuid)
+returns jsonb
+language sql
+stable
+as $$
+  select jsonb_build_object(
+    'resume', jsonb_build_object(
+      'title_resume', r.title_resume, 'job_title', r.job_title,
+      'first_name', r.first_name, 'last_name', r.last_name,
+      'email', r.email, 'phone', r.phone, 'city', r.city, 'summary', r.summary,
+      'template_key', r.template_key, 'accent_color', r.accent_color, 'font_size', r.font_size,
+      'font_family', r.font_family, 'content_density', r.content_density,
+      'section_spacing', r.section_spacing, 'heading_style', r.heading_style,
+      'divider_style', r.divider_style, 'section_order', r.section_order
+    ),
+    'experiences', coalesce((select jsonb_agg(jsonb_build_object(
+      'job_title', x.job_title, 'company', x.company, 'city', x.city,
+      'start_date', x.start_date, 'end_date', x.end_date, 'is_current', x.is_current, 'description', x.description
+    ) order by x.start_date desc nulls last, x.created_at desc) from experiences x where x.id_resume = r.id_resume), '[]'::jsonb),
+    'educations', coalesce((select jsonb_agg(jsonb_build_object(
+      'degree', e.degree, 'school', e.school, 'city', e.city,
+      'start_date', e.start_date, 'end_date', e.end_date, 'description', e.description
+    ) order by e.start_date desc nulls last, e.created_at desc) from educations e where e.id_resume = r.id_resume), '[]'::jsonb),
+    'skills', coalesce((select jsonb_agg(jsonb_build_object('name', s.name, 'level', s.level) order by s.created_at, s.name) from skills s where s.id_resume = r.id_resume), '[]'::jsonb),
+    'languages', coalesce((select jsonb_agg(jsonb_build_object('name', l.name, 'level', l.level) order by l.created_at, l.name) from languages l where l.id_resume = r.id_resume), '[]'::jsonb),
+    'custom_sections', coalesce((select jsonb_agg(jsonb_build_object(
+      'section_type', c.section_type, 'title', c.title, 'content', c.content, 'display_order', c.display_order
+    ) order by c.display_order, c.created_at) from resume_custom_sections c where c.id_resume = r.id_resume), '[]'::jsonb)
+  ) from resumes r where r.id_resume = p_resume_id;
+$$;
+
+create or replace function capture_resume_version(p_resume_id uuid, p_user_id uuid, p_reason varchar default 'Modification du CV')
+returns uuid
+language plpgsql
+as $$
+declare
+  snapshot_value jsonb;
+  previous_snapshot jsonb;
+  version_id uuid;
+begin
+  if not exists (select 1 from resumes r join users u on u.id_user = r.id_user where r.id_resume = p_resume_id and r.id_user = p_user_id and u.plan = 'pro') then
+    return null;
+  end if;
+  snapshot_value := build_resume_snapshot(p_resume_id);
+  select v.snapshot into previous_snapshot from resume_versions v where v.id_resume = p_resume_id order by v.created_at desc, v.id_resume_version desc limit 1;
+  if previous_snapshot is not null and previous_snapshot = snapshot_value then return null; end if;
+  insert into resume_versions (id_resume, id_user, version_label, reason, snapshot)
+  values (p_resume_id, p_user_id, 'Version du ' || to_char(clock_timestamp(), 'DD/MM/YYYY HH24:MI'), coalesce(nullif(p_reason, ''), 'Modification du CV'), snapshot_value)
+  returning id_resume_version into version_id;
+  return version_id;
+end;
+$$;
+
+create or replace function capture_resume_version_after_change()
+returns trigger
+language plpgsql
+as $$
+declare
+  resume_id uuid;
+  owner_id uuid;
+  reason_text varchar(160);
+begin
+  if current_setting('novyata.skip_resume_version_capture', true) = 'on' then return null; end if;
+  if tg_table_name = 'resumes' then
+    resume_id := case when tg_op = 'DELETE' then old.id_resume else new.id_resume end;
+  else
+    resume_id := case when tg_op = 'DELETE' then old.id_resume else new.id_resume end;
+  end if;
+  select r.id_user into owner_id from resumes r where r.id_resume = resume_id;
+  if owner_id is null then return null; end if;
+  reason_text := case
+    when tg_table_name = 'resumes' and tg_op = 'INSERT' then 'Version initiale'
+    when tg_table_name = 'resumes' then 'Mise à jour des informations et de l’apparence'
+    when tg_table_name = 'experiences' then case when tg_op = 'INSERT' then 'Expérience ajoutée' when tg_op = 'DELETE' then 'Expérience supprimée' else 'Expérience modifiée' end
+    when tg_table_name = 'educations' then case when tg_op = 'INSERT' then 'Formation ajoutée' when tg_op = 'DELETE' then 'Formation supprimée' else 'Formation modifiée' end
+    when tg_table_name = 'skills' then case when tg_op = 'INSERT' then 'Compétence ajoutée' when tg_op = 'DELETE' then 'Compétence supprimée' else 'Compétence modifiée' end
+    when tg_table_name = 'languages' then case when tg_op = 'INSERT' then 'Langue ajoutée' when tg_op = 'DELETE' then 'Langue supprimée' else 'Langue modifiée' end
+    else case when tg_op = 'INSERT' then 'Section ajoutée' when tg_op = 'DELETE' then 'Section supprimée' else 'Section modifiée' end
+  end;
+  perform capture_resume_version(resume_id, owner_id, reason_text);
+  return null;
+end;
+$$;
+
 drop trigger if exists users_set_updated_at on users;
 create trigger users_set_updated_at before update on users for each row execute function set_updated_at();
 
 drop trigger if exists resumes_set_updated_at on resumes;
 create trigger resumes_set_updated_at before update on resumes for each row execute function set_updated_at();
+drop trigger if exists public_profiles_set_updated_at on public_profiles;
+create trigger public_profiles_set_updated_at before update on public_profiles for each row execute function set_updated_at();
+drop trigger if exists weekly_goals_set_updated_at on weekly_goals;
+create trigger weekly_goals_set_updated_at before update on weekly_goals for each row execute function set_updated_at();
+drop trigger if exists resumes_capture_version on resumes;
+create trigger resumes_capture_version after insert or update on resumes for each row execute function capture_resume_version_after_change();
+drop trigger if exists experiences_capture_version on experiences;
+create trigger experiences_capture_version after insert or update or delete on experiences for each row execute function capture_resume_version_after_change();
+drop trigger if exists educations_capture_version on educations;
+create trigger educations_capture_version after insert or update or delete on educations for each row execute function capture_resume_version_after_change();
+drop trigger if exists skills_capture_version on skills;
+create trigger skills_capture_version after insert or update or delete on skills for each row execute function capture_resume_version_after_change();
+drop trigger if exists languages_capture_version on languages;
+create trigger languages_capture_version after insert or update or delete on languages for each row execute function capture_resume_version_after_change();
+drop trigger if exists resume_custom_sections_capture_version on resume_custom_sections;
+create trigger resume_custom_sections_capture_version after insert or update or delete on resume_custom_sections for each row execute function capture_resume_version_after_change();
 drop trigger if exists resume_custom_sections_set_updated_at on resume_custom_sections;
 create trigger resume_custom_sections_set_updated_at before update on resume_custom_sections for each row execute function set_updated_at();
 
@@ -398,6 +582,9 @@ create trigger languages_set_updated_at before update on languages for each row 
 drop trigger if exists ai_usage_set_updated_at on ai_usage;
 create trigger ai_usage_set_updated_at before update on ai_usage for each row execute function set_updated_at();
 
+drop trigger if exists resume_import_usage_set_updated_at on resume_import_usage;
+create trigger resume_import_usage_set_updated_at before update on resume_import_usage for each row execute function set_updated_at();
+
 drop trigger if exists application_followups_set_updated_at on application_followups;
 create trigger application_followups_set_updated_at before update on application_followups for each row execute function set_updated_at();
 drop trigger if exists interviews_set_updated_at on interviews;
@@ -406,3 +593,5 @@ drop trigger if exists saved_answers_set_updated_at on saved_answers;
 create trigger saved_answers_set_updated_at before update on saved_answers for each row execute function set_updated_at();
 drop trigger if exists interview_sessions_set_updated_at on interview_sessions;
 create trigger interview_sessions_set_updated_at before update on interview_sessions for each row execute function set_updated_at();
+drop trigger if exists notifications_set_updated_at on notifications;
+create trigger notifications_set_updated_at before update on notifications for each row execute function set_updated_at();

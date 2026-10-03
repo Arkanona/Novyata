@@ -3,9 +3,12 @@ import PersonalInfoForm from './PersonalInfoForm'
 import ResumePreview from './ResumePreview'
 import ResumeSections from './ResumeSections'
 import ResumeTags from './ResumeTags'
+import ResumeSkillSuggestions from './ResumeSkillSuggestions'
+import ResumeRepetitionHints from './ResumeRepetitionHints'
+import ResumeConsistencyChecks from './ResumeConsistencyChecks'
 import AdvancedResumeSections from './AdvancedResumeSections'
 import TemplateSelector from './TemplateSelector'
-import { updateResume } from '../../services/resumeService'
+import { generateResumeSummary, improveResumeSummary, updateResume } from '../../services/resumeService'
 import { exportResumePdf, PDF_OVERFLOW_MESSAGE } from '../../services/pdfExport'
 import Button from '../common/Button'
 
@@ -27,6 +30,9 @@ export default function ResumeEditor({ resume, onSaved, plan = 'free' }) {
   const [languages, setLanguages] = useState(resume.languages || [])
   const [customSections, setCustomSections] = useState(resume.custom_sections || [])
   const [hasVerticalOverflow, setHasVerticalOverflow] = useState(false)
+  const [summaryProposal, setSummaryProposal] = useState('')
+  const [summaryError, setSummaryError] = useState('')
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)
   const pendingAppearanceRef = useRef(null)
   const saveRef = useRef(null)
 
@@ -50,5 +56,18 @@ export default function ResumeEditor({ resume, onSaved, plan = 'free' }) {
     setExportError('')
     try { await exportResumePdf({ ...resume, ...previewResume }) } catch (error) { setExportError(error.code === 'PDF_CONTENT_OVERFLOW' ? PDF_OVERFLOW_MESSAGE : (error.message || 'La génération du PDF a échoué.')) } finally { setIsExporting(false) }
   }
-  return <div className="resume-editor-layout"><div className="resume-editor-panel"><PersonalInfoForm form={form} errors={errors} isSaving={isSaving} isOverflow={hasVerticalOverflow} onChange={handleChange} onSubmit={handleSubmit} />{feedback && <p className={Object.keys(errors).some((key) => errors[key]) ? 'editor-feedback editor-feedback--error' : 'editor-feedback'} role="status">{feedback}</p>}{hasVerticalOverflow && <p className="editor-feedback editor-feedback--warning" role="alert">{RESUME_OVERFLOW_WARNING}</p>}<TemplateSelector resume={previewResume} plan={plan} onChange={saveAppearance} /><ResumeSections resumeId={resume.id_resume} experiences={experiences} educations={educations} setExperiences={setExperiences} setEducations={setEducations} isOverflow={hasVerticalOverflow} /><ResumeTags resumeId={resume.id_resume} skills={skills} languages={languages} experiences={experiences} setSkills={setSkills} setLanguages={setLanguages} isOverflow={hasVerticalOverflow} /><AdvancedResumeSections resumeId={resume.id_resume} sections={customSections} sectionOrder={form.section_order} plan={plan} onSectionsChange={setCustomSections} onOrderChange={(sectionOrder) => setForm((current) => ({ ...current, section_order: sectionOrder }))} /></div><div className="resume-preview-with-action"><ResumePreview resume={previewResume} onOverflowChange={handleOverflowChange} /><div className="pdf-export-action"><Button type="button" onClick={handlePdfExport} disabled={isExporting || isSaving || hasVerticalOverflow} title={hasVerticalOverflow ? 'Réduisez le contenu ou la taille du texte avant l’export.' : undefined}>{isExporting ? 'Génération du PDF…' : 'Télécharger en PDF'}</Button>{exportError && <p className="editor-feedback editor-feedback--error" role="alert">{exportError}</p>}</div></div></div>
+  async function handleGenerateSummary() {
+    setIsGeneratingSummary(true); setSummaryError(''); setSummaryProposal('')
+    try { const result = await generateResumeSummary(resume.id_resume); setSummaryProposal(result.suggestion || '') }
+    catch (error) { setSummaryError(error.message) }
+    finally { setIsGeneratingSummary(false) }
+  }
+  async function handleImproveSummary() {
+    setIsGeneratingSummary(true); setSummaryError(''); setSummaryProposal('')
+    try { const result = await improveResumeSummary(resume.id_resume, form.summary); setSummaryProposal(result.suggestion || '') }
+    catch (error) { setSummaryError(error.message) }
+    finally { setIsGeneratingSummary(false) }
+  }
+  function applySummaryProposal() { setForm((current) => ({ ...current, summary: summaryProposal })); setFeedback('Proposition ajoutée au champ Présentation. Enregistrez le CV pour la conserver.'); setSummaryProposal('') }
+  return <div className="resume-editor-layout"><div className="resume-editor-panel"><PersonalInfoForm form={form} errors={errors} isSaving={isSaving} isOverflow={hasVerticalOverflow} onChange={handleChange} onSubmit={handleSubmit} onGenerateSummary={handleGenerateSummary} onImproveSummary={handleImproveSummary} isGeneratingSummary={isGeneratingSummary} summaryProposal={summaryProposal} onSummaryProposalChange={setSummaryProposal} onApplySummaryProposal={applySummaryProposal} summaryError={summaryError} />{feedback && <p className={Object.keys(errors).some((key) => errors[key]) ? 'editor-feedback editor-feedback--error' : 'editor-feedback'} role="status">{feedback}</p>}{hasVerticalOverflow && <p className="editor-feedback editor-feedback--warning" role="alert">{RESUME_OVERFLOW_WARNING}</p>}<TemplateSelector resume={previewResume} plan={plan} onChange={saveAppearance} /><ResumeSections resumeId={resume.id_resume} experiences={experiences} educations={educations} setExperiences={setExperiences} setEducations={setEducations} isOverflow={hasVerticalOverflow} /><ResumeSkillSuggestions resumeId={resume.id_resume} experiences={experiences} skills={skills} setSkills={setSkills} /><ResumeRepetitionHints experiences={experiences} /><ResumeConsistencyChecks summary={form.summary} experiences={experiences} educations={educations} skills={skills} /><ResumeTags resumeId={resume.id_resume} skills={skills} languages={languages} experiences={experiences} setSkills={setSkills} setLanguages={setLanguages} isOverflow={hasVerticalOverflow} /><AdvancedResumeSections resumeId={resume.id_resume} sections={customSections} sectionOrder={form.section_order} plan={plan} onSectionsChange={setCustomSections} onOrderChange={(sectionOrder) => setForm((current) => ({ ...current, section_order: sectionOrder }))} /></div><div className="resume-preview-with-action"><ResumePreview resume={previewResume} onOverflowChange={handleOverflowChange} /><div className="pdf-export-action"><Button type="button" onClick={handlePdfExport} disabled={isExporting || isSaving || hasVerticalOverflow} title={hasVerticalOverflow ? 'Réduisez le contenu ou la taille du texte avant l’export.' : undefined}>{isExporting ? 'Génération du PDF…' : 'Télécharger en PDF'}</Button>{exportError && <p className="editor-feedback editor-feedback--error" role="alert">{exportError}</p>}</div></div></div>
 }

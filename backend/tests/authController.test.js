@@ -162,6 +162,14 @@ describe('authController', () => {
     expect(res.json.mock.calls[0][0].user).not.toHaveProperty('password')
   })
 
+  it('restores saved job-search preferences from the authenticated user record', async () => {
+    const preferences = { roles: 'Data Analyst', location: 'Lyon', remote_work: 'Hybride' }
+    requireDatabase.mockReturnValue({ query: vi.fn().mockResolvedValue({ rows: [{ ...user, job_search_preferences: preferences }] }) })
+    const res = createResponse()
+    await me({ auth: { sub: user.id_user } }, res, vi.fn())
+    expect(res.json.mock.calls[0][0].user.job_search_preferences).toEqual(preferences)
+  })
+
   it('returns 401 when the JWT subject no longer has a user', async () => {
     requireDatabase.mockReturnValue({ query: vi.fn().mockResolvedValue({ rows: [] }) })
     const next = vi.fn()

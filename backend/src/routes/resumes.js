@@ -4,12 +4,22 @@ import { createResume, deleteResume, getResume, listResumes, updateResume } from
 import { createEducation, createExperience, deleteEducation, deleteExperience, updateEducation, updateExperience } from '../controllers/resumeSectionController.js'
 import { createLanguage, createSkill, deleteLanguage, deleteSkill, updateLanguage, updateSkill } from '../controllers/resumeTagController.js'
 import { createCustomSection, createResumeVariant, deleteCustomSection, reorderResumeSections, updateCustomSection } from '../controllers/resumeProController.js'
+import { createResumeFromImport, parseResumeImport } from '../controllers/resumeImportController.js'
+import { compareResumes, duplicateResumeVersion, listResumeVersions, restoreResumeVersion } from '../controllers/resumeHistoryController.js'
+import resumeShareRouter from './resumeShare.js'
 
 const router = Router()
 router.use(authenticate)
 router.get('/', listResumes)
+router.post('/import/parse', parseResumeImport)
+router.post('/import', createResumeFromImport)
+router.post('/compare', compareResumes)
 router.post('/', createResume)
 router.post('/:id/variants', createResumeVariant)
+router.use('/:id/share-links', resumeShareRouter)
+router.get('/:id/versions', listResumeVersions)
+router.post('/:id/versions/:versionId/restore', restoreResumeVersion)
+router.post('/:id/versions/:versionId/duplicate', duplicateResumeVersion)
 router.post('/:id/sections', createCustomSection)
 router.patch('/:id/sections/:sectionId', updateCustomSection)
 router.delete('/:id/sections/:sectionId', deleteCustomSection)

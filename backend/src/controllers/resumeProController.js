@@ -99,6 +99,7 @@ export async function createResumeVariant(req, res, next) {
 
     client = await database.connect()
     await client.query('begin')
+    await client.query("select set_config('novyata.skip_resume_version_capture', 'on', true)")
     const copied = await client.query('insert into resumes (id_user,parent_resume_id,title_resume,job_title,first_name,last_name,email,phone,city,summary,template_key,accent_color,font_size,font_family,content_density,section_spacing,heading_style,divider_style,section_order) select id_user,coalesce(parent_resume_id,id_resume),$1,job_title,first_name,last_name,email,phone,city,summary,template_key,accent_color,font_size,font_family,content_density,section_spacing,heading_style,divider_style,section_order from resumes where id_resume=$2 and id_user=$3 returning id_resume,parent_resume_id,title_resume,job_title,first_name,last_name,email,phone,city,summary,template_key,accent_color,font_size,font_family,content_density,section_spacing,heading_style,divider_style,section_order,created_at,updated_at', [title, req.params.id, req.auth.sub])
     const variant = copied.rows[0]
     if (!variant) throw new ApiError(404, 'CV introuvable.')
@@ -110,6 +111,7 @@ export async function createResumeVariant(req, res, next) {
       ['resume_custom_sections', 'id_resume_section,section_type,title,content,display_order', 'section_type,title,content,display_order'],
     ]
     for (const [table, , fields] of copies) await client.query(`insert into ${table} (id_resume,${fields}) select $1,${fields} from ${table} where id_resume=$2`, [variant.id_resume, req.params.id])
+    await client.query("select capture_resume_version($1, $2, 'Variante créée')", [variant.id_resume, req.auth.sub])
     await client.query('commit')
     return res.status(201).json({ resume: variant })
   } catch (error) {

@@ -33,7 +33,7 @@ describe('resume Pro controller', () => {
 
   it('copies a CV and its section data as an independent Pro variant', async () => {
     const variant = { id_resume: variantId, parent_resume_id: resumeId, title_resume: 'CloudNova' }
-    const clientQuery = vi.fn().mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [variant] }).mockResolvedValue({ rows: [] })
+    const clientQuery = vi.fn().mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [variant] }).mockResolvedValue({ rows: [] })
     const client = { query: clientQuery, release: vi.fn() }
     const database = { query: vi.fn().mockResolvedValue({ rows: [{ id_resume: resumeId, plan: 'pro' }] }), connect: vi.fn().mockResolvedValue(client) }
     requireDatabase.mockReturnValue(database)
@@ -41,7 +41,7 @@ describe('resume Pro controller', () => {
     await createResumeVariant({ params: { id: resumeId }, auth: { sub: userId }, body: { title_resume: 'CloudNova' } }, res, vi.fn())
     expect(res.status).toHaveBeenCalledWith(201)
     expect(res.json.mock.calls[0][0].resume).toMatchObject({ id_resume: variantId, parent_resume_id: resumeId })
-    expect(clientQuery.mock.calls[1][0]).toContain('coalesce(parent_resume_id,id_resume)')
+    expect(clientQuery.mock.calls[2][0]).toContain('coalesce(parent_resume_id,id_resume)')
     expect(clientQuery.mock.calls.filter(([sql]) => sql.startsWith('insert into')).length).toBe(6)
     expect(clientQuery).toHaveBeenCalledWith('commit')
     expect(client.release).toHaveBeenCalled()

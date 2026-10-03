@@ -20,11 +20,18 @@ const DashboardPage = lazy(() => import('./pages/DashboardPage'))
 const JobAnalysisPage = lazy(() => import('./pages/JobAnalysisPage'))
 const JobAnalysisDetailPage = lazy(() => import('./pages/JobAnalysisDetailPage'))
 const JobAnalysisListPage = lazy(() => import('./pages/JobAnalysisListPage'))
+const JobOfferComparisonPage = lazy(() => import('./pages/JobOfferComparisonPage'))
 const ResumeEditorPage = lazy(() => import('./pages/ResumeEditorPage'))
+const ResumeImportPage = lazy(() => import('./pages/ResumeImportPage'))
 const ResumeListPage = lazy(() => import('./pages/ResumeListPage'))
+const ResumeComparePage = lazy(() => import('./pages/ResumeComparePage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 const SavedAnswersPage = lazy(() => import('./pages/SavedAnswersPage'))
 const ActivityHistoryPage = lazy(() => import('./pages/ActivityHistoryPage'))
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'))
+const PortfolioSettingsPage = lazy(() => import('./pages/PortfolioSettingsPage'))
+const PublicPortfolioPage = lazy(() => import('./pages/PublicPortfolioPage'))
+const SharedResumePage = lazy(() => import('./pages/SharedResumePage'))
 
 function PageFallback() {
   return <main className="route-loading" role="status" aria-live="polite">Chargement de votre espace…</main>
@@ -50,10 +57,14 @@ export default function App() {
     <Route path="/confidentialite" element={<LegalPage />} />
     <Route path="/conditions" element={<LegalPage />} />
     <Route path="/cookies" element={<LegalPage />} />
+    <Route path="/p/:slug" element={lazyPage(PublicPortfolioPage)} />
+    <Route path="/cv/share/:token" element={lazyPage(SharedResumePage)} />
     <Route element={<PrivateRoute />}><Route element={<AppLayout />}>
       <Route path="/dashboard" element={lazyPage(DashboardPage)} />
       <Route path="/cv" element={lazyPage(ResumeListPage)} />
+      <Route path="/cv/importer" element={lazyPage(ResumeImportPage)} />
       <Route path="/cv/nouveau" element={lazyPage(ResumeEditorPage, { isNew: true })} />
+      <Route path="/cv/comparer" element={lazyPage(ResumeComparePage)} />
       <Route path="/cv/:id" element={lazyPage(ResumeEditorPage)} />
       <Route path="/lettres" element={lazyPage(CoverLetterListPage)} />
       <Route path="/lettres/nouvelle" element={lazyPage(CoverLetterEditorPage, { isNew: true })} />
@@ -63,10 +74,13 @@ export default function App() {
       <Route path="/candidatures/:id" element={lazyPage(ApplicationEditorPage)} />
       <Route path="/analyse-offre" element={lazyPage(JobAnalysisPage)} />
       <Route path="/analyses" element={lazyPage(JobAnalysisListPage)} />
+      <Route path="/analyses/comparer" element={lazyPage(JobOfferComparisonPage)} />
       <Route path="/analyses/:id" element={lazyPage(JobAnalysisDetailPage)} />
       <Route path="/parametres" element={lazyPage(SettingsPage)} />
       <Route path="/reponses" element={lazyPage(SavedAnswersPage)} />
       <Route path="/historique" element={lazyPage(ActivityHistoryPage)} />
+      <Route path="/notifications" element={lazyPage(NotificationsPage)} />
+      <Route path="/portfolio" element={lazyPage(PortfolioSettingsPage)} />
     </Route></Route>
     <Route path="*" element={<NotFoundPage />} />
   </Routes></AuthProvider></BrowserRouter>

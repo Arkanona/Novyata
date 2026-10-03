@@ -52,6 +52,7 @@ export async function applyCvAdaptation(req, res, next) {
     const summary = accepted.find((item) => item.field === 'summary')?.proposedText || resume.summary
     client = await database.connect()
     await client.query('begin')
+    await client.query("select set_config('novyata.skip_resume_version_capture', 'on', true)")
     const copied = await client.query('insert into resumes (id_user,parent_resume_id,title_resume,job_title,first_name,last_name,email,phone,city,summary,template_key,accent_color,font_size,font_family,content_density,section_spacing,heading_style,divider_style,section_order) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb) returning id_resume', [req.auth.sub, resume.parent_resume_id || resume.id_resume, titleForCopy(resume, analysis), resume.job_title, resume.first_name, resume.last_name, resume.email, resume.phone, resume.city, summary, resume.template_key, resume.accent_color, resume.font_size, resume.font_family || 'Inter', resume.content_density || 'normal', resume.section_spacing || 'normal', resume.heading_style || 'line', resume.divider_style || 'solid', JSON.stringify(resume.section_order || ['summary', 'experiences', 'educations', 'skills', 'languages'])])
     const idResume = copied.rows[0].id_resume
     for (const [index, experience] of resume.experiences.entries()) await client.query('insert into experiences (id_resume, job_title, company, city, start_date, end_date, is_current, description) values ($1, $2, $3, $4, $5, $6, $7, $8)', [idResume, experience.job_title, experience.company, experience.city, experience.start_date, experience.end_date, experience.is_current, descriptions.get(index) ?? experience.description])
@@ -59,6 +60,7 @@ export async function applyCvAdaptation(req, res, next) {
     for (const skill of resume.skills) await client.query('insert into skills (id_resume, name, level) values ($1, $2, $3)', [idResume, skill.name, skill.level])
     for (const language of resume.languages) await client.query('insert into languages (id_resume, name, level) values ($1, $2, $3)', [idResume, language.name, language.level])
     for (const section of resume.custom_sections) await client.query('insert into resume_custom_sections (id_resume,section_type,title,content,display_order) values ($1,$2,$3,$4,$5)', [idResume, section.section_type, section.title, section.content, section.display_order])
+    await client.query("select capture_resume_version($1, $2, 'CV adapté à une offre')", [idResume, req.auth.sub])
     await client.query('commit')
     return res.status(201).json({ resume: { id_resume: idResume, title_resume: titleForCopy(resume, analysis) }, appliedCount: accepted.length })
   } catch (error) {

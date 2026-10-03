@@ -3,9 +3,10 @@ const TOKEN_KEY = 'novyata_auth_token'
 
 async function request(path, options = {}) {
   const token = localStorage.getItem(TOKEN_KEY)
+  const isMultipart = typeof FormData !== 'undefined' && options.body instanceof FormData
   const response = await fetch(API_URL + path, {
     headers: {
-      'Content-Type': 'application/json',
+      ...(!isMultipart ? { 'Content-Type': 'application/json' } : {}),
       Authorization: token ? 'Bearer ' + token : '',
       ...options.headers,
     },
@@ -30,6 +31,16 @@ export function getResume(id) {
 
 export function createResume(payload) {
   return request('/api/v1/resumes', { method: 'POST', body: JSON.stringify(payload) })
+}
+
+export function parseResumeFile(file) {
+  const form = new FormData()
+  form.append('file', file)
+  return request('/api/v1/resumes/import/parse', { method: 'POST', body: form })
+}
+
+export function createResumeFromImport(payload) {
+  return request('/api/v1/resumes/import', { method: 'POST', body: JSON.stringify(payload) })
 }
 
 export function updateResume(id, payload) {
@@ -57,3 +68,10 @@ export function updateCustomResumeSection(resumeId, sectionId, payload) { return
 export function deleteCustomResumeSection(resumeId, sectionId) { return request('/api/v1/resumes/' + resumeId + '/sections/' + sectionId, { method: 'DELETE' }) }
 export function updateResumeSectionOrder(resumeId, sectionOrder) { return request('/api/v1/resumes/' + resumeId + '/section-order', { method: 'PUT', body: JSON.stringify({ section_order: sectionOrder }) }) }
 export function createResumeVariant(resumeId, titleResume) { return request('/api/v1/resumes/' + resumeId + '/variants', { method: 'POST', body: JSON.stringify({ title_resume: titleResume }) }) }
+export function getResumeVersions(resumeId) { return request('/api/v1/resumes/' + resumeId + '/versions') }
+export function restoreResumeVersion(resumeId, versionId) { return request('/api/v1/resumes/' + resumeId + '/versions/' + versionId + '/restore', { method: 'POST' }) }
+export function duplicateResumeVersion(resumeId, versionId, titleResume) { return request('/api/v1/resumes/' + resumeId + '/versions/' + versionId + '/duplicate', { method: 'POST', body: JSON.stringify({ title_resume: titleResume }) }) }
+export function compareResumes(leftResumeId, rightResumeId) { return request('/api/v1/resumes/compare', { method: 'POST', body: JSON.stringify({ leftResumeId, rightResumeId }) }) }
+export function generateResumeSummary(resumeId) { return request('/api/v1/resume-tools/' + resumeId + '/summary', { method: 'POST' }) }
+export function improveResumeExperience(resumeId, experienceId, text) { return request('/api/v1/resume-tools/' + resumeId + '/experiences/' + experienceId + '/improve', { method: 'POST', body: JSON.stringify({ text }) }) }
+export function improveResumeSummary(resumeId, text) { return request('/api/v1/resume-tools/' + resumeId + '/summary/improve', { method: 'POST', body: JSON.stringify({ text }) }) }

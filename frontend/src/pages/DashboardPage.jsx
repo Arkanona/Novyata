@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import Button from '../components/common/Button'
 import ResumeCard from '../components/dashboard/ResumeCard'
 import AdvancedStatisticsPanel from '../components/dashboard/AdvancedStatisticsPanel'
+import WeeklyGoals from '../components/dashboard/WeeklyGoals'
 import { getApplications } from '../services/applicationService'
 import { getResumes } from '../services/resumeService'
 import { useAuth } from '../store/AuthContext'
@@ -26,6 +27,7 @@ export default function DashboardPage() {
     {isLoading && <div className="dashboard-feedback">Chargement de vos CV…</div>}
     {error && <div className="dashboard-feedback dashboard-feedback--error">{error}</div>}
     {!isLoading && !error && <><section className="application-statistics">{statistics.map(([label, value]) => <article key={label}><span>{label}</span><strong>{value}</strong></article>)}</section><section className="application-funnel" aria-label="Parcours de vos candidatures"><h2>Parcours de vos candidatures</h2><ol>{funnel.map(([label, value]) => <li key={label}><b>{value}</b><span>{label}</span></li>)}</ol></section></>}
+    {!isLoading && !error && <WeeklyGoals />}
     {!isLoading && !error && user?.plan === 'pro' && <AdvancedStatisticsPanel />}
     {!isLoading && !error && resumes.length === 0 && <section className="dashboard-empty"><span><FileText size={23} /></span><h2>Vous n’avez encore aucun CV.</h2><p>Créez votre premier CV pour commencer.</p><Link to="/cv/nouveau"><Button><CirclePlus size={17} /> Créer un CV</Button></Link></section>}
     {!isLoading && !error && resumes.length > 0 && <section className="dashboard-resumes"><div className="dashboard-section-heading"><div><h2>Mes CV</h2><p>Retrouvez et modifiez vos documents.</p></div><span>{resumes.length} {resumes.length > 1 ? 'CV' : 'CV'}</span></div><div className="resume-card-grid">{resumes.map((resume) => <ResumeCard key={resume.id_resume} resume={resume} />)}</div></section>}

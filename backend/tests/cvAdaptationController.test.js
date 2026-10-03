@@ -70,7 +70,7 @@ describe('cvAdaptationController', () => {
   it('copies the CV preferences and applies only accepted proposals', async () => {
     const customSection = { section_type: 'projects', title: 'Projets', content: 'Projet produit.', display_order: 0 }
     const database = sourceDatabase({ customSections: [customSection] })
-    const client = { query: vi.fn().mockResolvedValueOnce({}).mockResolvedValueOnce({ rows: [{ id_resume: '3e2c3d2f-6ff2-43d2-9e4f-5443200f6d4b' }] }).mockResolvedValue({}), release: vi.fn() }
+    const client = { query: vi.fn().mockResolvedValueOnce({}).mockResolvedValueOnce({}).mockResolvedValueOnce({ rows: [{ id_resume: '3e2c3d2f-6ff2-43d2-9e4f-5443200f6d4b' }] }).mockResolvedValue({}), release: vi.fn() }
     database.connect = vi.fn().mockResolvedValue(client); requireDatabase.mockReturnValue(database)
     validateAdaptation.mockReturnValue({ proposals: [proposal, { id: 'summary-0', field: 'summary', targetIndex: 0, currentText: resume.summary, proposedText: 'Résumé non accepté.', reason: 'Test.' }] })
     const res = createResponse()

@@ -1,6 +1,7 @@
 import { requireDatabase } from '../config/database.js'
 import ApiError from '../utils/ApiError.js'
 import { FOLLOWUP_SUGGESTION_DAYS } from '../config/applications.js'
+import { normalizeInterviewExchanges } from '../utils/interviewSessions.js'
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const datePattern = /^\d{4}-\d{2}-\d{2}$/
@@ -156,7 +157,8 @@ export async function getApplicationDossier(req, res, next) {
     const applicationDate = application.application_date ? new Date(application.application_date) : null
     const elapsedDays = applicationDate ? Math.floor((Date.now() - applicationDate.getTime()) / 86_400_000) : 0
     const followupSuggestion = { suggested: application.status === 'Candidature envoyée' && !followups.rows.some((followup) => followup.sent_at) && elapsedDays >= FOLLOWUP_SUGGESTION_DAYS, days: FOLLOWUP_SUGGESTION_DAYS }
-    return res.json({ application, events: events.rows, followups: followups.rows, interviews: interviews.rows, interview_sessions: interviewSessions.rows, checklist: checklist.map(([id, label, done]) => ({ id, label, done, required: id === 'required' })), followupSuggestion })
+    const sessions = interviewSessions.rows.map((session) => ({ ...session, exchanges: normalizeInterviewExchanges(session.exchanges) }))
+    return res.json({ application, events: events.rows, followups: followups.rows, interviews: interviews.rows, interview_sessions: sessions, checklist: checklist.map(([id, label, done]) => ({ id, label, done, required: id === 'required' })), followupSuggestion })
   } catch (error) { return next(error) }
 }
 

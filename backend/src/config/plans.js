@@ -5,15 +5,18 @@ export const AI_FEATURES = Object.freeze({
   APPLICATION_FOLLOWUP: 'application_followup',
   INTERVIEW_PREPARATION: 'interview_preparation',
   INTERVIEW_SIMULATION: 'interview_simulation',
+  RESUME_SUMMARY: 'resume_summary',
+  EXPERIENCE_REWRITE: 'experience_rewrite',
 })
 
 export const PLANS = Object.freeze({
-  free: { label: 'Novyata Free', quotas: { [AI_FEATURES.JOB_ANALYSIS]: 5, [AI_FEATURES.COVER_LETTER_GENERATION]: 3, [AI_FEATURES.CV_ADAPTATION]: 0, [AI_FEATURES.APPLICATION_FOLLOWUP]: 3, [AI_FEATURES.INTERVIEW_PREPARATION]: 3, [AI_FEATURES.INTERVIEW_SIMULATION]: 5 } },
-  pro: { label: 'Novyata Pro', quotas: { [AI_FEATURES.JOB_ANALYSIS]: 50, [AI_FEATURES.COVER_LETTER_GENERATION]: 30, [AI_FEATURES.CV_ADAPTATION]: 30, [AI_FEATURES.APPLICATION_FOLLOWUP]: 30, [AI_FEATURES.INTERVIEW_PREPARATION]: 30, [AI_FEATURES.INTERVIEW_SIMULATION]: 60 } },
+  free: { label: 'Novyata Free', limits: { resumeImportsPerMonth: 3, resumeShareLinks: 1 }, quotas: { [AI_FEATURES.JOB_ANALYSIS]: 5, [AI_FEATURES.COVER_LETTER_GENERATION]: 3, [AI_FEATURES.CV_ADAPTATION]: 0, [AI_FEATURES.APPLICATION_FOLLOWUP]: 3, [AI_FEATURES.INTERVIEW_PREPARATION]: 3, [AI_FEATURES.INTERVIEW_SIMULATION]: 5, [AI_FEATURES.RESUME_SUMMARY]: 3, [AI_FEATURES.EXPERIENCE_REWRITE]: 3 } },
+  pro: { label: 'Novyata Pro', limits: { resumeImportsPerMonth: 30, resumeShareLinks: 20 }, quotas: { [AI_FEATURES.JOB_ANALYSIS]: 50, [AI_FEATURES.COVER_LETTER_GENERATION]: 30, [AI_FEATURES.CV_ADAPTATION]: 30, [AI_FEATURES.APPLICATION_FOLLOWUP]: 30, [AI_FEATURES.INTERVIEW_PREPARATION]: 30, [AI_FEATURES.INTERVIEW_SIMULATION]: 60, [AI_FEATURES.RESUME_SUMMARY]: 20, [AI_FEATURES.EXPERIENCE_REWRITE]: 20 } },
 })
 
 export function normalizePlan(plan) { return plan === 'pro' ? 'pro' : 'free' }
 export function quotaFor(plan, feature) { return PLANS[normalizePlan(plan)].quotas[feature] ?? 0 }
+export function planLimit(plan, limit) { return PLANS[normalizePlan(plan)].limits[limit] ?? 0 }
 export const RESUME_TEMPLATE_ACCESS = Object.freeze({ classic: 'free', modern: 'free', minimal: 'free', corporate: 'pro', elegant: 'pro', tech: 'pro', creative: 'pro', student: 'pro', manager: 'pro' })
 export const FREE_ACCENT_COLORS = Object.freeze(['#314A67', '#4C627A', '#3F6B5B', '#7A4B4B', '#5B5F97', '#374151'])
 export const PRO_ACCENT_COLORS = Object.freeze(['#2F6B65', '#6F5A46', '#8A5A74', '#A7633B'])

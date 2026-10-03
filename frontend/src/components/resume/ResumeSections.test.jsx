@@ -3,10 +3,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 vi.mock('../../services/resumeService', () => ({
-  createEducation: vi.fn(), createExperience: vi.fn(), deleteEducation: vi.fn(), deleteExperience: vi.fn(), updateEducation: vi.fn(), updateExperience: vi.fn(),
+  createEducation: vi.fn(), createExperience: vi.fn(), deleteEducation: vi.fn(), deleteExperience: vi.fn(), improveResumeExperience: vi.fn(), updateEducation: vi.fn(), updateExperience: vi.fn(),
 }))
 
-import { updateEducation, updateExperience } from '../../services/resumeService'
+import { improveResumeExperience, updateEducation, updateExperience } from '../../services/resumeService'
 import ResumeSections from './ResumeSections'
 
 const experience = { id_experience: 'experience-1', job_title: 'Développeur Web Junior', company: 'PixelForge', city: 'Marseille', start_date: '2026-01-01', end_date: '2026-06-01', is_current: false, description: 'Développement de fonctionnalités web.' }
@@ -46,5 +46,19 @@ describe('ResumeSections', () => {
     await waitFor(() => expect(updateEducation).toHaveBeenCalled())
     await waitFor(() => expect(screen.queryByLabelText('Diplôme / Formation')).toBeNull())
     expect(screen.getByText('Université de Marseille')).toBeTruthy()
+  })
+
+  it('shows an editable experience rewrite and applies it only after explicit acceptance', async () => {
+    improveResumeExperience.mockResolvedValue({ suggestion: 'Conception et livraison de fonctionnalités web pour PixelForge.' })
+    render(<Harness />)
+    fireEvent.click(screen.getByRole('button', { name: 'Modifier Développeur Web Junior' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Améliorer la description' }))
+    const suggestion = await screen.findByDisplayValue('Conception et livraison de fonctionnalités web pour PixelForge.')
+    expect(screen.getByLabelText('Description').value).toBe('Développement de fonctionnalités web.')
+    fireEvent.change(suggestion, { target: { value: 'Reformulation relue manuellement.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Utiliser cette proposition' }))
+    expect(screen.getByLabelText('Description').value).toBe('Reformulation relue manuellement.')
+    expect(updateExperience).not.toHaveBeenCalled()
+    expect(improveResumeExperience).toHaveBeenCalledWith('resume-1', 'experience-1', experience.description)
   })
 })

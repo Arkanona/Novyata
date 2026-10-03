@@ -14,6 +14,13 @@ import resumesRouter from './routes/resumes.js'
 import usageRouter from './routes/usage.js'
 import savedAnswersRouter from './routes/savedAnswers.js'
 import activityRouter from './routes/activity.js'
+import notificationsRouter from './routes/notifications.js'
+import resumeAiRouter from './routes/resumeAi.js'
+import portfolioRouter from './routes/portfolio.js'
+import sharedResumesRouter from './routes/sharedResumes.js'
+import weeklyGoalsRouter from './routes/weeklyGoals.js'
+import offerUrlRouter from './routes/offerUrl.js'
+import resumeOfferMatchingRouter from './routes/resumeOfferMatching.js'
 import { stripeWebhook } from './controllers/billingController.js'
 import { errorHandler, notFound } from './middleware/errorHandler.js'
 
@@ -41,6 +48,13 @@ const aiLimiter = rateLimit({
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: { error: { message: 'Trop de demandes IA. Réessayez dans quelques instants.' } },
+})
+const offerImportLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { error: { message: 'Trop d’imports d’offres. Réessayez dans quelques instants ou collez le texte manuellement.' } },
 })
 const authLimiter = rateLimit({
   windowMs: numericEnvironment('AUTH_RATE_LIMIT_WINDOW_MS', 15 * 60 * 1000),
@@ -77,11 +91,18 @@ app.use('/api/v1/billing', billingRouter)
 app.use('/api/v1/cover-letters', coverLettersRouter)
 app.use('/api/v1/cover-letter-generation', aiLimiter, coverLetterGenerationRouter)
 app.use('/api/v1/job-analysis', aiLimiter, jobAnalysisRouter)
+app.use('/api/v1/job-offer-import', offerImportLimiter, offerUrlRouter)
+app.use('/api/v1/resume-matching', resumeOfferMatchingRouter)
 app.use('/api/v1/job-analyses', jobAnalysesRouter)
 app.use('/api/v1/job-analyses/:id/cv-adaptation', aiLimiter, cvAdaptationRouter)
 app.use('/api/v1/resumes', resumesRouter)
+app.use('/api/v1/shared-resumes', sharedResumesRouter)
+app.use('/api/v1/resume-tools', aiLimiter, resumeAiRouter)
 app.use('/api/v1/usage', usageRouter)
 app.use('/api/v1/saved-answers', savedAnswersRouter)
+app.use('/api/v1/notifications', notificationsRouter)
+app.use('/api/v1/portfolio', portfolioRouter)
+app.use('/api/v1/weekly-goals', weeklyGoalsRouter)
 app.use(notFound)
 app.use(errorHandler)
 

@@ -1,6 +1,6 @@
 import Button from '../common/Button'
 
-export default function PersonalInfoForm({ form, errors, isSaving, isOverflow, onChange, onSubmit }) {
+export default function PersonalInfoForm({ form, errors, isSaving, isOverflow, onChange, onSubmit, onGenerateSummary, onImproveSummary, isGeneratingSummary, summaryProposal, onSummaryProposalChange, onApplySummaryProposal, summaryError }) {
   return <form className="personal-info-form" onSubmit={onSubmit} noValidate>
     <div className="editor-form-heading"><p>Informations personnelles</p><h1>Présentez-vous avec clarté.</h1><span>Ces informations sont affichées directement dans votre CV.</span></div>
     <div className="editor-field-grid"><label>Prénom<input name="first_name" value={form.first_name} onChange={onChange} autoComplete="given-name" aria-invalid={Boolean(errors.first_name)} />{errors.first_name && <small>{errors.first_name}</small>}</label><label>Nom<input name="last_name" value={form.last_name} onChange={onChange} autoComplete="family-name" aria-invalid={Boolean(errors.last_name)} />{errors.last_name && <small>{errors.last_name}</small>}</label></div>
@@ -8,6 +8,9 @@ export default function PersonalInfoForm({ form, errors, isSaving, isOverflow, o
     <div className="editor-field-grid"><label>Adresse e-mail<input type="email" name="email" value={form.email} onChange={onChange} autoComplete="email" aria-invalid={Boolean(errors.email)} />{errors.email && <small>{errors.email}</small>}</label><label>Téléphone<input type="tel" name="phone" value={form.phone} onChange={onChange} autoComplete="tel" aria-invalid={Boolean(errors.phone)} />{errors.phone && <small>{errors.phone}</small>}</label></div>
     <label>Ville<input name="city" value={form.city} onChange={onChange} autoComplete="address-level2" aria-invalid={Boolean(errors.city)} />{errors.city && <small>{errors.city}</small>}</label>
     <label>Présentation<textarea name="summary" value={form.summary} onChange={onChange} rows="6" placeholder="Présentez votre parcours, vos atouts et ce que vous recherchez." aria-invalid={Boolean(errors.summary)} />{errors.summary && <small>{errors.summary}</small>}</label>
+    <div className="resume-summary-assistant"><Button type="button" variant="secondary" onClick={onGenerateSummary} disabled={isGeneratingSummary}>{isGeneratingSummary ? 'Préparation de la proposition…' : 'Générer un résumé'}</Button><Button type="button" variant="secondary" onClick={onImproveSummary} disabled={isGeneratingSummary || (form.summary || '').trim().length < 20}>{isGeneratingSummary ? 'Préparation de la proposition…' : 'Améliorer ce texte'}</Button><small>Votre texte actuel ne sera jamais remplacé automatiquement.</small></div>
+    {summaryError && <p className="editor-feedback editor-feedback--error" role="alert">{summaryError}</p>}
+    {summaryProposal && <section className="resume-summary-proposal" aria-label="Proposition de résumé"><h2>Proposition à relire</h2><label>Résumé proposé<textarea value={summaryProposal} onChange={(event) => onSummaryProposalChange(event.target.value)} rows="5" /></label><div><Button type="button" variant="secondary" onClick={onApplySummaryProposal}>Utiliser cette proposition</Button><Button type="button" variant="secondary" onClick={() => onSummaryProposalChange('')}>Ignorer</Button></div></section>}
     <Button type="submit" disabled={isSaving || isOverflow} title={isOverflow ? 'Réduisez le contenu ou la taille du texte pour enregistrer.' : undefined}>{isSaving ? 'Enregistrement…' : 'Enregistrer'}</Button>
   </form>
 }

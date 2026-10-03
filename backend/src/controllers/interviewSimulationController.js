@@ -2,6 +2,8 @@ import { requireDatabase } from '../config/database.js'
 import { AI_FEATURES, capabilitiesFor } from '../config/plans.js'
 import { assertAiQuota, consumeAiQuota } from '../services/aiUsageService.js'
 import { simulateInterview } from '../services/interviewSimulationService.js'
+import { normalizeInterviewExchanges } from '../utils/interviewSessions.js'
+import { compactSearchProfile } from '../utils/searchProfile.js'
 import ApiError from '../utils/ApiError.js'
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -43,7 +45,7 @@ export async function createInterviewSimulation(req, res, next) {
     if (!uuid.test(req.params.id)) throw new ApiError(400, 'Identifiant de candidature invalide.')
     const db = requireDatabase()
     const application = (await db.query(
-      'select company_name, job_title, id_resume, id_job_analysis, notes from applications where id_application = $1 and id_user = $2',
+      'select applications.company_name, applications.job_title, applications.id_resume, applications.id_job_analysis, applications.notes, users.job_search_preferences from applications join users on users.id_user = applications.id_user where applications.id_application = $1 and applications.id_user = $2',
       [req.params.id, req.auth.sub]
     )).rows[0]
     if (!application) throw new ApiError(404, 'Candidature introuvable.')
@@ -58,19 +60,37 @@ export async function createInterviewSimulation(req, res, next) {
       )
       if (!previous.rows[0]) throw new ApiError(404, 'Simulation introuvable.')
       if (previous.rows[0].status === 'completed') throw new ApiError(409, 'Cette simulation est terminée. Démarrez-en une nouvelle.')
+      const existingExchanges = normalizeInterviewExchanges(previous.rows[0].exchanges)
+      const latest = existingExchanges.at(-1)
+      if (!latest) throw new ApiError(409, 'Aucune question en attente dans cette simulation.')
+      if (latest.answer && latest.feedback) throw new ApiError(409, 'Aucune question en attente dans cette simulation.')
+      if (!latest.answer && !answer) throw new ApiError(400, 'Rédigez votre réponse avant de continuer la simulation.')
+      if (!latest.answer) {
+        latest.answer = answer
+        latest.answered_at = new Date().toISOString()
+        const savedAnswer = await db.query('update interview_sessions set exchanges = $1 where id_interview_session = $2 and id_application = $3 and id_user = $4 returning id_interview_session', [JSON.stringify(existingExchanges), req.body.sessionId, req.params.id, req.auth.sub])
+        if (!savedAnswer.rows[0]) throw new ApiError(404, 'Simulation introuvable.')
+      }
+      previous.rows[0].exchanges = existingExchanges
     }
 
     const usage = await assertAiQuota(db, req.auth.sub, AI_FEATURES.INTERVIEW_SIMULATION)
     const capabilities = capabilitiesFor(usage?.plan)
-    const simulation = await simulateInterview({ ...await getSimulationContext(db, application, req.auth.sub), answer: answer || null, tier: capabilities.advancedInterview ? 'pro' : 'free' })
+    const evaluatedAnswer = previous ? previous.rows[0].exchanges.at(-1).answer : answer
+    const simulation = await simulateInterview({ ...await getSimulationContext(db, application, req.auth.sub), searchProfile: compactSearchProfile(application.job_search_preferences), answer: evaluatedAnswer || null, tier: capabilities.advancedInterview ? 'pro' : 'free' })
     await consumeAiQuota(db, req.auth.sub, AI_FEATURES.INTERVIEW_SIMULATION)
 
-    const exchanges = [...(previous?.rows[0]?.exchanges || []), {
-      answer,
-      feedback: simulation.feedback,
-      question: simulation.question,
-      created_at: new Date().toISOString()
-    }]
+    const exchanges = normalizeInterviewExchanges(previous?.rows[0]?.exchanges || [])
+    const now = new Date().toISOString()
+    if (previous) {
+      const pending = exchanges.at(-1)
+      if (!pending?.answer || pending.feedback) throw new ApiError(409, 'Aucune réponse à analyser dans cette simulation.')
+      pending.feedback = simulation.feedback
+      pending.answered_at ||= now
+      exchanges.push({ question: simulation.question, answer: '', feedback: null, created_at: now })
+    } else {
+      exchanges.push({ question: simulation.question, answer: '', feedback: null, created_at: now })
+    }
     const saved = previous
       ? await db.query(
         'update interview_sessions set exchanges = $1 where id_interview_session = $2 returning id_interview_session, status, exchanges, jsonb_array_length(exchanges) as progress, created_at, updated_at',
@@ -81,7 +101,7 @@ export async function createInterviewSimulation(req, res, next) {
         [req.params.id, req.auth.sub, JSON.stringify(exchanges)]
       )
 
-    return res.json({ simulation, session: saved.rows[0] })
+    return res.json({ simulation: { question: simulation.question, feedback: previous ? simulation.feedback : null }, session: { ...saved.rows[0], exchanges: normalizeInterviewExchanges(saved.rows[0].exchanges) } })
   } catch (error) {
     return next(error)
   }

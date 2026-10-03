@@ -16,8 +16,11 @@
     "dotenv": "latest",
     "express": "latest",
     "express-rate-limit": "^8.7.0",
+    "formidable": "^3.5.4",
     "helmet": "^8.3.0",
     "jsonwebtoken": "latest",
+    "mammoth": "^1.13.0",
+    "pdfjs-dist": "^6.3.289",
     "pg": "latest",
     "stripe": "^23.0.0"
   },

@@ -3,14 +3,14 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { MemoryRouter } from 'react-router-dom'
 
 vi.mock('../services/resumeService', () => ({ getResumes: vi.fn() }))
-vi.mock('../services/jobAnalysisService', () => ({ analyzeJobOffer: vi.fn() }))
+vi.mock('../services/jobAnalysisService', () => ({ analyzeJobOffer: vi.fn(), importOfferFromUrl: vi.fn(), matchResumesToOffer: vi.fn() }))
 vi.mock('../services/coverLetterGenerationService', () => ({ generateCoverLetter: vi.fn() }))
 vi.mock('../services/coverLetterService', () => ({ createCoverLetter: vi.fn() }))
 vi.mock('../store/AuthContext', () => ({ useAuth: vi.fn() }))
 
 import { createCoverLetter } from '../services/coverLetterService'
 import { generateCoverLetter } from '../services/coverLetterGenerationService'
-import { analyzeJobOffer } from '../services/jobAnalysisService'
+import { analyzeJobOffer, importOfferFromUrl, matchResumesToOffer } from '../services/jobAnalysisService'
 import { getResumes } from '../services/resumeService'
 import { useAuth } from '../store/AuthContext'
 import JobAnalysisPage from './JobAnalysisPage'
@@ -68,5 +68,39 @@ describe('JobAnalysisPage', () => {
     expect(screen.getByText('Une preuve de méthode ou de projet reste à détailler.')).toBeTruthy()
     expect(screen.getByText('Jira n’est pas présent dans le CV.')).toBeTruthy()
     expect(screen.getByText('Compétence appréciée mais non indispensable.')).toBeTruthy()
+  })
+
+  it('imports a public offer URL into editable fields before analysis', async () => {
+    useAuth.mockReturnValue({ user: { first_name: 'Marie', last_name: 'Laurent' } })
+    getResumes.mockResolvedValue({ resumes: [resume] })
+    importOfferFromUrl.mockResolvedValue({ offer: { sourceUrl: 'https://jobs.example/role', companyName: 'Example', jobTitle: 'Data Analyst', description: 'Une description publique suffisamment longue pour être analysée avec les attentes du poste.', location: 'Lyon', contractType: 'CDI', salary: '', warnings: ['Salaire non détecté.'] } })
+    analyzeJobOffer.mockResolvedValue({ analysis: { matchScore: 71, strongMatches: [], partialMatches: [], importantMissingSkills: [], optionalMissingSkills: [], importantKeywords: [], suggestions: [] } })
+    render(<MemoryRouter><JobAnalysisPage /></MemoryRouter>)
+
+    await waitFor(() => expect(screen.getByRole('option', { name: /CV Produit/ })).toBeTruthy())
+    fireEvent.change(screen.getByLabelText('CV à analyser'), { target: { value: resume.id_resume } })
+    fireEvent.change(screen.getByLabelText('URL publique de l’offre'), { target: { value: 'https://jobs.example/role' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Importer l’offre' }))
+    await waitFor(() => expect(screen.getByLabelText('Entreprise').value).toBe('Example'))
+    expect(screen.getByLabelText('Poste visé').value).toBe('Data Analyst')
+    expect(screen.getByLabelText(/Texte de l/).value).toContain('description publique')
+    expect(screen.getByRole('status').textContent).toContain('Vérifiez les champs')
+    fireEvent.click(screen.getByRole('button', { name: /Analyser l/ }))
+    await waitFor(() => expect(analyzeJobOffer).toHaveBeenCalledWith(expect.objectContaining({ companyName: 'Example', jobTitle: 'Data Analyst' })))
+  })
+
+  it('shows an estimated match across CVs without changing the selected CV', async () => {
+    useAuth.mockReturnValue({ user: { first_name: 'Marie', plan: 'pro' } })
+    getResumes.mockResolvedValue({ resumes: [resume] })
+    matchResumesToOffer.mockResolvedValue({ matching: { confidence: 'estimated', note: 'Estimation fondée sur les compétences explicites.', results: [{ resumeId: resume.id_resume, title: 'CV Produit', jobTitle: 'Product Designer', score: 50, matchedSkills: ['Figma'], missingSkills: ['SQL'] }] } })
+    render(<MemoryRouter><JobAnalysisPage /></MemoryRouter>)
+    await waitFor(() => expect(screen.getByRole('option', { name: /CV Produit/ })).toBeTruthy())
+    fireEvent.change(screen.getByLabelText(/Texte de l/), { target: { value: 'Nous recherchons Figma et SQL.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Comparer mes CV' }))
+    await waitFor(() => expect(screen.getByText('Correspondance estimée')).toBeTruthy())
+    expect(screen.getByText('50%')).toBeTruthy()
+    expect(screen.getByText('Présentes : Figma')).toBeTruthy()
+    expect(matchResumesToOffer).toHaveBeenCalledWith('Nous recherchons Figma et SQL.')
+    expect(screen.getByLabelText('CV à analyser').value).toBe('')
   })
 })

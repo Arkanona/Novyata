@@ -6,7 +6,7 @@ import { openCustomerPortal, startProCheckout } from '../services/billingService
 import { getUsage } from '../services/usageService'
 import { useAuth } from '../store/AuthContext'
 
-const labels = { job_analysis: 'Analyse d’offres', cover_letter_generation: 'Lettres IA', cv_adaptation: 'Adaptations CV', application_followup: 'Relances IA', interview_preparation: 'Préparation entretien', interview_simulation: 'Simulation entretien' }
+const labels = { job_analysis: 'Analyse d’offres', cover_letter_generation: 'Lettres IA', cv_adaptation: 'Adaptations CV', application_followup: 'Relances IA', interview_preparation: 'Préparation entretien', interview_simulation: 'Simulation entretien', resume_summary: 'Résumé professionnel', experience_rewrite: 'Reformulation d’expérience' }
 export default function SettingsPage() {
   const { user, setUser, theme, setTheme, logout } = useAuth(); const navigate = useNavigate(); const [searchParams, setSearchParams] = useSearchParams(); const [profile, setProfile] = useState(() => ({ first_name: user.first_name, last_name: user.last_name, email: user.email })); const [searchPreferences, setSearchPreferences] = useState(() => user.job_search_preferences || {}); const [passwords, setPasswords] = useState({ current_password: '', new_password: '', confirmation: '' }); const [message, setMessage] = useState(''); const [error, setError] = useState(''); const [deleting, setDeleting] = useState(false); const [usage, setUsage] = useState(null); const [billingLoading, setBillingLoading] = useState(false); const [billingRefreshPending, setBillingRefreshPending] = useState(false)
   useEffect(() => { getUsage().then(({ usage: result }) => setUsage(result)).catch(() => {}) }, [])

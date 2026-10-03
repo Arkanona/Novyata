@@ -3,7 +3,7 @@ import { createResponse } from './helpers.js'
 
 vi.mock('../src/config/database.js', () => ({ requireDatabase: vi.fn() }))
 vi.mock('../src/services/cvAdaptationService.js', () => ({ proposeCvAdaptation: vi.fn(), validateAdaptation: vi.fn() }))
-vi.mock('../src/services/aiUsageService.js', () => ({ assertAiQuota: vi.fn(), consumeAiQuota: vi.fn() }))
+vi.mock('../src/services/aiUsageService.js', () => ({ assertAiQuota: vi.fn(), consumeAiQuota: vi.fn(), runWithAiQuota: vi.fn(async (_db, _user, _feature, work) => work({ plan: 'pro', onRequestStart: vi.fn() })) }))
 
 import { requireDatabase } from '../src/config/database.js'
 import { proposeCvAdaptation, validateAdaptation } from '../src/services/cvAdaptationService.js'

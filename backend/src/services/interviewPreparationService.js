@@ -1,4 +1,6 @@
 import ApiError from '../utils/ApiError.js'
+import { AI_FEATURES } from '../config/plans.js'
+import { requestStructuredOutput } from './openAiClient.js'
 
 const questionCategories = ['rh', 'technique', 'comportementale']
 const limits = Object.freeze({ questions: 6, strengths: 3, prepare: 3, recruiterQuestions: 4 })
@@ -17,10 +19,6 @@ const schema = {
   },
   required: ['questions', 'strengths', 'prepare', 'recruiterQuestions', 'introduction'],
 }
-
-const outputText = (data) => typeof data.output_text === 'string'
-  ? data.output_text
-  : data.output?.flatMap((item) => item.content || []).filter((item) => item.type === 'output_text').map((item) => item.text).join('') || ''
 
 function stringList(value, limit, field) {
   if (!Array.isArray(value) || value.length > limit || value.some((item) => typeof item !== 'string' || !item.trim() || item.trim().length > 300)) {
@@ -55,32 +53,20 @@ export function validateInterviewPreparation(value) {
   }
 }
 
-export async function generateInterviewPreparation(context) {
-  if (!process.env.OPENAI_API_KEY) throw new ApiError(503, 'Le service IA n’est pas configuré.')
-  let response
-  try {
-    response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(Number(process.env.OPENAI_TIMEOUT_MS) || 60000),
-      body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || 'gpt-6-luna',
-        reasoning: { effort: 'low' },
-        instructions: 'Prépare en français une introduction et des questions RH, métier et comportementales selon le CV et l’offre. Les préférences de recherche sont des souhaits, pas des faits. N’invente aucun fait ni expérience. Pour le comportemental, invite à répondre selon Situation, Tâche, Action, Résultat sans compléter à sa place. JSON du schéma seulement.',
-        input: JSON.stringify(context),
-        text: { format: { type: 'json_schema', name: 'interview_preparation', strict: true, schema } },
-        max_output_tokens: 1300,
-      }),
-    })
-  } catch (error) {
-    throw new ApiError(error?.name === 'TimeoutError' ? 504 : 502, error?.name === 'TimeoutError' ? 'La préparation a expiré.' : 'Le service de préparation est temporairement indisponible.')
-  }
-  if (!response.ok) throw new ApiError(response.status === 429 ? 429 : 502, 'Le service de préparation est temporairement indisponible.')
-  const data = await response.json()
-  if (process.env.NODE_ENV !== 'production' && data.usage) console.info('OpenAI interview preparation tokens:', data.usage)
-  if (data.status === 'incomplete' || data.incomplete_details || data.status === 'failed' || data.error) throw new ApiError(502, 'Le service de préparation a renvoyé une réponse incomplète.')
-  try { return validateInterviewPreparation(JSON.parse(outputText(data))) } catch (error) {
-    if (error instanceof ApiError) throw error
-    throw new ApiError(502, 'Le service de préparation a renvoyé une réponse invalide.')
-  }
+export async function generateInterviewPreparation(context, { onRequestStart } = {}) {
+  return requestStructuredOutput({
+    feature: AI_FEATURES.INTERVIEW_PREPARATION,
+    onRequestStart,
+    instructions: 'Prépare en français une introduction et des questions RH, métier et comportementales selon le CV et l’offre. Les préférences de recherche sont des souhaits, pas des faits. N’invente aucun fait ni expérience. Pour le comportemental, invite à répondre selon Situation, Tâche, Action, Résultat sans compléter à sa place. JSON du schéma seulement.',
+    input: context,
+    schema,
+    schemaName: 'interview_preparation',
+    errors: {
+      provider: 'Le service de préparation est temporairement indisponible.',
+      timeout: 'La préparation a expiré.',
+      invalid: 'Le service de préparation a renvoyé une réponse invalide.',
+      incomplete: 'Le service de préparation a renvoyé une réponse incomplète.',
+    },
+    validate: validateInterviewPreparation,
+  })
 }

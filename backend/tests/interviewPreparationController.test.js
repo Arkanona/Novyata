@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createResponse } from './helpers.js'
 
 vi.mock('../src/config/database.js', () => ({ requireDatabase: vi.fn() }))
-vi.mock('../src/services/aiUsageService.js', () => ({ assertAiQuota: vi.fn(), consumeAiQuota: vi.fn() }))
+vi.mock('../src/services/aiUsageService.js', () => ({ assertAiQuota: vi.fn(), consumeAiQuota: vi.fn(), runWithAiQuota: vi.fn(async (_db, _user, _feature, work) => work({ plan: 'free', onRequestStart: vi.fn() })) }))
 vi.mock('../src/services/interviewPreparationService.js', () => ({ generateInterviewPreparation: vi.fn() }))
 
 import { requireDatabase } from '../src/config/database.js'
-import { assertAiQuota, consumeAiQuota } from '../src/services/aiUsageService.js'
+import { runWithAiQuota } from '../src/services/aiUsageService.js'
 import { generateInterviewPreparation } from '../src/services/interviewPreparationService.js'
 import { createInterviewPreparation } from '../src/controllers/interviewPreparationController.js'
 
@@ -30,7 +30,6 @@ describe('interviewPreparationController', () => {
       .mockResolvedValueOnce({ rows: [{ name: 'Anglais', level: 'Courant' }] })
       .mockResolvedValueOnce({ rows: [{ job_description: 'Offre Product Designer', analysis_result: { requirements: [{ id: 'req_1', name: 'Figma' }], strongMatches: [{ requirementId: 'req_1' }], importantKeywords: ['Figma'] } }] }) }
     requireDatabase.mockReturnValue(database)
-    assertAiQuota.mockResolvedValue({ plan: 'free' })
     const res = createResponse(); const next = vi.fn()
 
     await createInterviewPreparation({ params: { id: applicationId }, auth: { sub: userId } }, res, next)
@@ -41,10 +40,9 @@ describe('interviewPreparationController', () => {
       company: 'CloudNova', jobTitle: 'Product Designer', searchProfile: { roles: 'Product designer', location: 'Lyon' },
       cv: { jobTitle: 'Designer', summary: 'Profil utilisateur', experiences: [{ role: 'Designer UX', organization: 'Studio Nova', description: 'Recherche et tests utilisateur' }], education: [{ degree: 'Master design', school: 'École Nova', description: 'Parcours produit' }], skills: ['Figma', 'Recherche utilisateur'], languages: [{ name: 'Anglais', level: 'Courant' }] },
       offer: { jobDescription: 'Offre Product Designer', analysis: { strongMatches: ['Figma'], partialMatches: [], importantMissingSkills: [], importantKeywords: ['Figma'] } },
-    })
+    }, expect.objectContaining({ onRequestStart: expect.any(Function) }))
     expect(JSON.stringify(generateInterviewPreparation.mock.calls[0][0])).not.toContain('private@example.test')
-    expect(assertAiQuota).toHaveBeenCalledOnce()
-    expect(consumeAiQuota).toHaveBeenCalledOnce()
+    expect(runWithAiQuota).toHaveBeenCalledOnce()
     expect(res.json).toHaveBeenCalledWith({ preparation: expect.objectContaining({ introduction: 'Présentation réelle.' }) })
   })
 
@@ -64,6 +62,6 @@ describe('interviewPreparationController', () => {
     const next = vi.fn()
     await createInterviewPreparation({ params: { id: applicationId }, auth: { sub: userId } }, createResponse(), next)
     expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 400 })
-    expect(assertAiQuota).not.toHaveBeenCalled()
+    expect(runWithAiQuota).not.toHaveBeenCalled()
   })
 })

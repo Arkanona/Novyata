@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createResponse } from './helpers.js'
 
 vi.mock('../src/config/database.js', () => ({ requireDatabase: vi.fn() }))
-vi.mock('../src/services/aiUsageService.js', () => ({ assertAiQuota: vi.fn(), consumeAiQuota: vi.fn() }))
+vi.mock('../src/services/aiUsageService.js', () => ({ assertAiQuota: vi.fn(), consumeAiQuota: vi.fn(), runWithAiQuota: vi.fn(async (_db, _user, _feature, work) => work({ plan: 'pro', onRequestStart: vi.fn() })) }))
 vi.mock('../src/services/applicationFollowupService.js', () => ({ generateFollowup: vi.fn() }))
 
 import { requireDatabase } from '../src/config/database.js'
-import { assertAiQuota, consumeAiQuota } from '../src/services/aiUsageService.js'
+import { runWithAiQuota } from '../src/services/aiUsageService.js'
 import { generateFollowup } from '../src/services/applicationFollowupService.js'
 import { createFollowup, createThankYou, markFollowupSent } from '../src/controllers/applicationFollowupController.js'
 import { createInterview, updateInterview } from '../src/controllers/interviewController.js'
@@ -80,7 +80,7 @@ describe('application lifecycle controllers', () => {
     requireDatabase.mockReturnValue({ query })
     const res = createResponse()
     await createFollowup({ params: { id: application }, auth: { sub: user }, body: { type: 'Deuxième relance' } }, res, vi.fn())
-    expect(generateFollowup).toHaveBeenCalledWith(expect.objectContaining({ type: 'Deuxième relance', company: 'Novyata' }))
+    expect(generateFollowup).toHaveBeenCalledWith(expect.objectContaining({ type: 'Deuxième relance', company: 'Novyata' }), expect.objectContaining({ onRequestStart: expect.any(Function) }))
     expect(res.status).toHaveBeenCalledWith(201)
   })
 
@@ -102,9 +102,8 @@ describe('application lifecycle controllers', () => {
     requireDatabase.mockReturnValue({ query })
     const res = createResponse()
     await createThankYou({ params: { id: application }, auth: { sub: user } }, res, vi.fn())
-    expect(assertAiQuota).toHaveBeenCalled()
-    expect(consumeAiQuota).toHaveBeenCalled()
-    expect(generateFollowup).toHaveBeenCalledWith(expect.objectContaining({ kind: 'thank_you', company: 'Novyata', interview: { interview_type: 'Visio', key_points: 'Portfolio' } }))
+    expect(runWithAiQuota).toHaveBeenCalled()
+    expect(generateFollowup).toHaveBeenCalledWith(expect.objectContaining({ kind: 'thank_you', company: 'Novyata', interview: { interview_type: 'Visio', key_points: 'Portfolio' } }), expect.objectContaining({ onRequestStart: expect.any(Function) }))
     expect(res.status).toHaveBeenCalledWith(201)
   })
 

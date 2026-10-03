@@ -1,6 +1,6 @@
 import { requireDatabase } from '../config/database.js'
 import { AI_FEATURES, capabilitiesFor } from '../config/plans.js'
-import { assertAiQuota, consumeAiQuota } from '../services/aiUsageService.js'
+import { runWithAiQuota } from '../services/aiUsageService.js'
 import { simulateInterview } from '../services/interviewSimulationService.js'
 import { normalizeInterviewExchanges } from '../utils/interviewSessions.js'
 import { compactSearchProfile } from '../utils/searchProfile.js'
@@ -34,9 +34,9 @@ async function getSimulationContext(db, application, userId) {
     jobTitle: application.job_title,
     cv: resumeResult.rows[0] || null,
     offer: analysisResult.rows[0]
-      ? { jobDescription: String(analysisResult.rows[0].job_description || '').slice(0, 2500), analysis: compactAnalysis(analysisResult.rows[0].analysis_result) }
+      ? { jobDescription: String(analysisResult.rows[0].job_description || ''), analysis: compactAnalysis(analysisResult.rows[0].analysis_result) }
       : null,
-    notes: application.notes ? String(application.notes).slice(0, 600) : null
+    notes: application.notes || null
   }
 }
 
@@ -50,7 +50,8 @@ export async function createInterviewSimulation(req, res, next) {
     )).rows[0]
     if (!application) throw new ApiError(404, 'Candidature introuvable.')
 
-    const answer = typeof req.body?.answer === 'string' ? req.body.answer.trim().slice(0, 4000) : ''
+    const answer = typeof req.body?.answer === 'string' ? req.body.answer.trim() : ''
+    if (answer.length > 4000) throw new ApiError(400, 'Une réponse de simulation ne peut pas dépasser 4 000 caractères.')
     let previous = null
     if (req.body?.sessionId) {
       if (!uuid.test(req.body.sessionId)) throw new ApiError(400, 'Identifiant de simulation invalide.')
@@ -74,11 +75,9 @@ export async function createInterviewSimulation(req, res, next) {
       previous.rows[0].exchanges = existingExchanges
     }
 
-    const usage = await assertAiQuota(db, req.auth.sub, AI_FEATURES.INTERVIEW_SIMULATION)
-    const capabilities = capabilitiesFor(usage?.plan)
     const evaluatedAnswer = previous ? previous.rows[0].exchanges.at(-1).answer : answer
-    const simulation = await simulateInterview({ ...await getSimulationContext(db, application, req.auth.sub), searchProfile: compactSearchProfile(application.job_search_preferences), answer: evaluatedAnswer || null, tier: capabilities.advancedInterview ? 'pro' : 'free' })
-    await consumeAiQuota(db, req.auth.sub, AI_FEATURES.INTERVIEW_SIMULATION)
+    const context = { ...await getSimulationContext(db, application, req.auth.sub), searchProfile: compactSearchProfile(application.job_search_preferences), answer: evaluatedAnswer || null }
+    const simulation = await runWithAiQuota(db, req.auth.sub, AI_FEATURES.INTERVIEW_SIMULATION, ({ plan, onRequestStart }) => simulateInterview({ ...context, tier: capabilitiesFor(plan).advancedInterview ? 'pro' : 'free' }, { onRequestStart }))
 
     const exchanges = normalizeInterviewExchanges(previous?.rows[0]?.exchanges || [])
     const now = new Date().toISOString()

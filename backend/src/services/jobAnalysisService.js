@@ -1,4 +1,6 @@
 import ApiError from '../utils/ApiError.js'
+import { AI_FEATURES } from '../config/plans.js'
+import { requestStructuredOutput } from './openAiClient.js'
 
 const openAiTimeout = () => {
   const value = Number.parseInt(process.env.OPENAI_TIMEOUT_MS, 10)
@@ -76,12 +78,12 @@ function twoSentences(value) {
 }
 
 function compactRecord(record, fields) {
-  return Object.fromEntries(fields.map(([source, target, maxLength]) => [target, typeof maxLength === 'number' ? cleanText(record?.[source], maxLength) : record?.[source]]).filter(([, value]) => Array.isArray(value) ? value.length > 0 : Boolean(value)))
+  return Object.fromEntries(fields.map(([source, target]) => [target, typeof record?.[source] === 'string' ? record[source].trim() : record?.[source]]).filter(([, value]) => Array.isArray(value) ? value.length > 0 : Boolean(value)))
 }
 
-function compactCollection(items, fields, maxItems) {
+function compactCollection(items, fields) {
   if (!Array.isArray(items)) return []
-  return items.map((item) => compactRecord(item, fields)).filter((item) => Object.keys(item).length > 0).slice(0, maxItems)
+  return items.map((item) => compactRecord(item, fields)).filter((item) => Object.keys(item).length > 0)
 }
 
 // This is the only CV representation sent to OpenAI. It deliberately excludes
@@ -90,13 +92,13 @@ export function buildCompactResume(resume = {}) {
   return compactRecord({
     job_title: resume.job_title,
     summary: resume.summary,
-    experiences: compactCollection(resume.experiences, [['job_title', 'jobTitle', 90], ['company', 'company', 90], ['description', 'description', 300]], 3),
-    educations: compactCollection(resume.educations, [['degree', 'degree', 100], ['school', 'school', 100], ['description', 'description', 160]], 2),
-    skills: compactCollection(resume.skills, [['name', 'name', 50], ['level', 'level', 20]], 12),
-    languages: compactCollection(resume.languages, [['name', 'name', 50], ['level', 'level', 20]], 5),
+    experiences: compactCollection(resume.experiences, [['job_title', 'jobTitle'], ['company', 'company'], ['description', 'description']]),
+    educations: compactCollection(resume.educations, [['degree', 'degree'], ['school', 'school'], ['description', 'description']]),
+    skills: compactCollection(resume.skills, [['name', 'name'], ['level', 'level']]),
+    languages: compactCollection(resume.languages, [['name', 'name'], ['level', 'level']]),
   }, [
-    ['job_title', 'jobTitle', 90],
-    ['summary', 'summary', 600],
+    ['job_title', 'jobTitle'],
+    ['summary', 'summary'],
     ['experiences', 'experiences'],
     ['educations', 'educations'],
     ['skills', 'skills'],
@@ -192,19 +194,17 @@ function logOpenAiFailure({ status, error = {}, cause } = {}) {
     status,
     code: error.code,
     type: error.type,
-    message: error.message,
     param: error.param,
     causeName: cause?.name,
     causeCode: cause?.cause?.code || cause?.code,
-    causeMessage: cause?.message,
   })
 }
 
 function describeValidationValue(value) {
   if (Array.isArray(value)) return { type: 'array', length: value.length, itemKeys: value.filter((item) => item && typeof item === 'object' && !Array.isArray(item)).slice(0, 3).map((item) => Object.keys(item)) }
   if (value && typeof value === 'object') return { type: 'object', keys: Object.keys(value) }
-  if (typeof value === 'string') return { type: 'string', length: value.length, value: value.slice(0, 160) }
-  return { type: typeof value, value }
+  if (typeof value === 'string') return { type: 'string', length: value.length }
+  return { type: typeof value }
 }
 
 function logAnalysisResponseShape(value) {
@@ -237,9 +237,7 @@ function normalizeWhitespace(value) {
 }
 
 function compactJobDescription(value) {
-  const description = normalizeWhitespace(value)
-  if (description.length <= 2600) return description
-  return `${description.slice(0, 2099)} ${description.slice(-500)}`
+  return normalizeWhitespace(value)
 }
 
 function analysisInstructions() {
@@ -382,63 +380,29 @@ export function validateAnalysis(value, sources = []) {
   }
 }
 
-export async function analyzeJobDescription({ resume, jobDescription }) {
+export async function analyzeJobDescription({ resume, jobDescription, onRequestStart }) {
   logOpenAiConfiguration()
-  if (!process.env.OPENAI_API_KEY) throw new ApiError(503, 'Le service d’analyse IA n’est pas configuré.')
   const analysisResume = buildCompactResume(resume)
   const analysisSources = buildAnalysisSources(analysisResume)
   const analysisJobDescription = compactJobDescription(jobDescription)
-  let response
-  try {
-    response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(openAiTimeout()),
-      body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || 'gpt-6-luna',
-        reasoning: { effort: 'low' },
-        max_output_tokens: maxOutputTokens(),
-        instructions: analysisInstructions(),
-        input: `Sources CV (id: texte):\n${serializeSourcesForPrompt(analysisSources)}\nOffre:\n${analysisJobDescription}`,
-        text: { verbosity: 'low', format: { type: 'json_schema', name: 'job_analysis', strict: true, schema: analysisSchemaForSources(analysisSources) } },
-      }),
-    })
-  } catch (error) {
-    logOpenAiFailure({ cause: error })
-    if (error?.name === 'TimeoutError' || error?.name === 'AbortError') throw new ApiError(504, 'Le service d’analyse a expiré. Réessayez dans quelques instants.')
-    throw new ApiError(502, 'Le service d’analyse est temporairement indisponible.')
-  }
-  if (!response.ok) {
-    // Keep the provider detail in the backend terminal only: it is useful for
-    // configuration diagnostics while the browser keeps a safe error message.
-    let providerError = {}
-    try { providerError = (await response.json()).error || {} } catch { /* Non-JSON provider response. */ }
-    logOpenAiFailure({ status: response.status, error: providerError })
-    throw providerApiError(response.status)
-  }
-  const data = await response.json()
-  logOpenAiUsage(data.usage)
-  if (data.status === 'incomplete' || data.incomplete_details) {
-    logOpenAiTruncation(data)
-    throw new ApiError(502, 'La génération de l’analyse a atteint sa limite. Réessayez dans quelques instants.')
-  }
-  if (data.status === 'failed' || data.error) {
-    const providerError = data.error || {}
-    logOpenAiFailure({ status: response.status, error: providerError })
-    throw new ApiError(502, 'Le service d’analyse est temporairement indisponible.')
-  }
-  let parsedAnalysis
-  try { parsedAnalysis = JSON.parse(textFromResponse(data)) } catch (error) {
-    if (isDevelopment()) console.error('Invalid analysis:', { field: 'response', expected: 'valid JSON matching the Structured Outputs schema', received: { parseError: error.message, outputLength: textFromResponse(data).length } })
-    throw new ApiError(502, 'Le service d’analyse a renvoyé une réponse invalide.')
-  }
-  logAnalysisResponseShape(parsedAnalysis)
-  try {
-    const analysis = validateAnalysis(parsedAnalysis, analysisSources)
-    logAnalysisCounts(analysis)
-    return analysis
-  } catch (error) {
-    if (error instanceof ApiError) throw error
-    throw new ApiError(502, 'Le service d’analyse a renvoyé une réponse invalide.')
-  }
+  return requestStructuredOutput({
+    feature: AI_FEATURES.JOB_ANALYSIS,
+    onRequestStart,
+    input: `Sources CV (id: texte):\n${serializeSourcesForPrompt(analysisSources)}\nOffre:\n${analysisJobDescription}`,
+    instructions: analysisInstructions(),
+    schema: analysisSchemaForSources(analysisSources),
+    schemaName: 'job_analysis',
+    errors: {
+      timeout: 'Le service d’analyse a expiré. Réessayez dans quelques instants.',
+      provider: 'Le service d’analyse est temporairement indisponible.',
+      incomplete: 'La génération de l’analyse a atteint sa limite. Réessayez dans quelques instants.',
+      invalid: 'Le service d’analyse a renvoyé une réponse invalide.',
+    },
+    validate: (parsedAnalysis) => {
+      logAnalysisResponseShape(parsedAnalysis)
+      const analysis = validateAnalysis(parsedAnalysis, analysisSources)
+      logAnalysisCounts(analysis)
+      return analysis
+    },
+  })
 }

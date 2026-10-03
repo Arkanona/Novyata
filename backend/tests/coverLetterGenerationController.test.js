@@ -3,7 +3,7 @@ import { createResponse } from './helpers.js'
 
 vi.mock('../src/config/database.js', () => ({ requireDatabase: vi.fn() }))
 vi.mock('../src/services/coverLetterGenerationService.js', () => ({ generateCoverLetter: vi.fn() }))
-vi.mock('../src/services/aiUsageService.js', () => ({ assertAiQuota: vi.fn(), consumeAiQuota: vi.fn() }))
+vi.mock('../src/services/aiUsageService.js', () => ({ assertAiQuota: vi.fn(), consumeAiQuota: vi.fn(), runWithAiQuota: vi.fn(async (_db, _user, _feature, work) => work({ plan: 'free', onRequestStart: vi.fn() })) }))
 
 import { requireDatabase } from '../src/config/database.js'
 import { generateCoverLetter } from '../src/services/coverLetterGenerationService.js'
@@ -23,6 +23,13 @@ describe('coverLetterGenerationController', () => {
     const next = vi.fn()
     await createGeneratedCoverLetter({ auth: { sub: userId }, body: { resumeId, jobDescription: '' } }, createResponse(), next)
     expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 400, details: { jobDescription: expect.any(String) } })
+    expect(requireDatabase).not.toHaveBeenCalled()
+  })
+
+  it('rejects oversized company metadata rather than silently shortening it', async () => {
+    const next = vi.fn()
+    await createGeneratedCoverLetter({ auth: { sub: userId }, body: { ...body, companyName: 'x'.repeat(161) } }, createResponse(), next)
+    expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 400, details: { companyName: expect.any(String) } })
     expect(requireDatabase).not.toHaveBeenCalled()
   })
 

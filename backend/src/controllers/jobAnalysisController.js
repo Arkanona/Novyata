@@ -2,11 +2,11 @@ import { requireDatabase } from '../config/database.js'
 import { analyzeJobDescription } from '../services/jobAnalysisService.js'
 import ApiError from '../utils/ApiError.js'
 import { AI_FEATURES } from '../config/plans.js'
-import { assertAiQuota, consumeAiQuota } from '../services/aiUsageService.js'
+import { runWithAiQuota } from '../services/aiUsageService.js'
 import { presentAnalysisForPlan } from '../utils/analysisPresentation.js'
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-const optionalText = (value, maxLength) => typeof value === 'string' ? value.trim().slice(0, maxLength) : ''
+const optionalText = (value) => typeof value === 'string' ? value.trim() : ''
 const isDevelopment = () => process.env.NODE_ENV !== 'production'
 
 function logInsertPayload({ userId, resumeId, jobDescription, analysis, serializedAnalysis }) {
@@ -33,10 +33,8 @@ function logInsertError(error) {
   console.error('Job analysis INSERT failed:', {
     code: error.code,
     constraint: error.constraint,
-    detail: error.detail,
     column: error.column,
     table: error.table,
-    message: error.message,
   })
 }
 
@@ -46,9 +44,11 @@ function validateRequest(body) {
   const errors = {}
   if (!resumeId || !uuidPattern.test(resumeId)) errors.resumeId = 'Sélectionnez un CV valide.'
   if (!jobDescription) errors.jobDescription = 'Collez le texte de l’offre avant de lancer l’analyse.'
-  if (jobDescription && jobDescription.length > 20000) errors.jobDescription = 'L’offre ne peut pas dépasser 20 000 caractères.'
+  if (jobDescription && jobDescription.length > 12000) errors.jobDescription = 'L’offre ne peut pas dépasser 12 000 caractères.'
+  if (typeof body.companyName === 'string' && body.companyName.trim().length > 160) errors.companyName = 'Le nom de l’entreprise ne peut pas dépasser 160 caractères.'
+  if (typeof body.jobTitle === 'string' && body.jobTitle.trim().length > 160) errors.jobTitle = 'Le poste ne peut pas dépasser 160 caractères.'
   if (Object.keys(errors).length) throw new ApiError(400, 'Certaines informations sont invalides.', errors)
-  return { resumeId, jobDescription, companyName: optionalText(body.companyName, 160), jobTitle: optionalText(body.jobTitle, 160) }
+  return { resumeId, jobDescription, companyName: optionalText(body.companyName), jobTitle: optionalText(body.jobTitle) }
 }
 
 export async function analyzeJob(req, res, next) {
@@ -64,9 +64,11 @@ export async function analyzeJob(req, res, next) {
       database.query('select name, level from skills where id_resume = $1', [resumeId]),
       database.query('select name, level from languages where id_resume = $1', [resumeId]),
     ])
-    const usage = await assertAiQuota(database, req.auth.sub, AI_FEATURES.JOB_ANALYSIS)
-    const analysis = await analyzeJobDescription({ resume: { ...resume, experiences: experiences.rows, educations: educations.rows, skills: skills.rows, languages: languages.rows }, jobDescription })
-    await consumeAiQuota(database, req.auth.sub, AI_FEATURES.JOB_ANALYSIS)
+    let plan = 'free'
+    const analysis = await runWithAiQuota(database, req.auth.sub, AI_FEATURES.JOB_ANALYSIS, ({ plan: reservedPlan, onRequestStart }) => {
+      plan = reservedPlan
+      return analyzeJobDescription({ resume: { ...resume, experiences: experiences.rows, educations: educations.rows, skills: skills.rows, languages: languages.rows }, jobDescription, onRequestStart })
+    })
     const serializedAnalysis = JSON.stringify(analysis)
     logInsertPayload({ userId: req.auth.sub, resumeId, jobDescription, analysis, serializedAnalysis })
     let saved
@@ -79,6 +81,6 @@ export async function analyzeJob(req, res, next) {
       logInsertError(error)
       throw error
     }
-    return res.status(201).json({ analysis: { ...presentAnalysisForPlan(analysis, usage?.plan), id_job_analysis: saved.rows[0].id_job_analysis, created_at: saved.rows[0].created_at, updated_at: saved.rows[0].updated_at } })
+    return res.status(201).json({ analysis: { ...presentAnalysisForPlan(analysis, plan), id_job_analysis: saved.rows[0].id_job_analysis, created_at: saved.rows[0].created_at, updated_at: saved.rows[0].updated_at } })
   } catch (error) { return next(error) }
 }

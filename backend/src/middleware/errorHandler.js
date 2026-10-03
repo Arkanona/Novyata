@@ -10,8 +10,11 @@ export function errorHandler(error, req, res, next) {
   const message = isApiError ? error.message : 'Une erreur interne est survenue.'
 
   if (statusCode >= 500) {
-    const detail = process.env.NODE_ENV === 'production' ? error.message : error
-    console.error('API error:', detail)
+    console.error('API error:', {
+      statusCode,
+      errorName: typeof error?.name === 'string' ? error.name : 'Error',
+      errorCode: typeof error?.code === 'string' || typeof error?.code === 'number' ? error.code : undefined,
+    })
   }
 
   res.status(statusCode).json({

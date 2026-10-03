@@ -35,6 +35,34 @@ describe('jobAnalysisService', () => {
     ]))
   })
 
+  it('keeps all relevant CV text intact and defers oversize rejection to the shared preflight guard', () => {
+    const longDescription = 'Expérience détaillée '.repeat(40)
+    const richResume = {
+      ...resume,
+      summary: 'Présentation complète '.repeat(40),
+      experiences: [1, 2, 3, 4].map((index) => ({ job_title: `Poste ${index}`, company: `Entreprise ${index}`, description: longDescription })),
+      educations: [{ degree: 'Diplôme complet '.repeat(15), school: 'Université', description: 'Formation détaillée '.repeat(20) }],
+      skills: Array.from({ length: 16 }, (_, index) => ({ name: `Compétence ${index}`, level: 'Confirmé' })),
+    }
+    const compact = buildCompactResume(richResume)
+    expect(compact.summary).toBe(richResume.summary.trim())
+    expect(compact.experiences).toHaveLength(4)
+    expect(compact.experiences[3].description).toBe(longDescription.trim())
+    expect(compact.educations[0].degree).toBe(richResume.educations[0].degree.trim())
+    expect(compact.skills).toHaveLength(16)
+    expect(compact).not.toHaveProperty('email')
+    expect(compact).not.toHaveProperty('phone')
+  })
+
+  it('rejects an oversized complete CV before any provider request instead of clipping it', async () => {
+    vi.stubEnv('OPENAI_API_KEY', 'test-key')
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(analyzeJobDescription({ resume: { ...resume, summary: 'Profil complet '.repeat(2_000) }, jobDescription: 'Offre courte.' }))
+      .rejects.toMatchObject({ statusCode: 413 })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('sends source IDs to OpenAI and reconstructs evidence on the backend', async () => {
     vi.stubEnv('OPENAI_API_KEY', 'test-key')
     const rawAnalysis = analysis({ strongMatches: [{ requirementId: 'req_1', sourceId: 'src_language_2', reason: 'Niveau indiqué dans le CV.' }] })

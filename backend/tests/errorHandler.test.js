@@ -16,10 +16,14 @@ describe('error handling', () => {
     expect(res.json).toHaveBeenCalledWith({ error: { message: 'Champ invalide.', details: { email: 'Invalide' } } })
   })
 
-  it('sends unknown errors as a generic 500 response', () => {
+  it('sends unknown errors as a generic 500 and logs only safe error metadata', () => {
     const res = createResponse()
-    errorHandler(new Error('database password'), {}, res, vi.fn())
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {})
+    errorHandler(Object.assign(new Error('database password: secret'), { code: 'DB_ERROR' }), {}, res, vi.fn())
     expect(res.json.mock.calls[0][0].error.message).toBe('Une erreur interne est survenue.')
+    expect(errorLog).toHaveBeenCalledWith('API error:', { statusCode: 500, errorName: 'Error', errorCode: 'DB_ERROR' })
+    expect(JSON.stringify(errorLog.mock.calls)).not.toContain('secret')
+    errorLog.mockRestore()
   })
 
   it('does not include details when an API error has none', () => {

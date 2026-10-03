@@ -2,7 +2,7 @@ import { requireDatabase } from '../config/database.js'
 import { proposeCvAdaptation, validateAdaptation } from '../services/cvAdaptationService.js'
 import ApiError from '../utils/ApiError.js'
 import { AI_FEATURES, capabilitiesFor } from '../config/plans.js'
-import { assertAiQuota, consumeAiQuota } from '../services/aiUsageService.js'
+import { runWithAiQuota } from '../services/aiUsageService.js'
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const titleForCopy = (resume, analysis) => `${resume.title_resume} — ${analysis.company_name || analysis.job_title || 'adapté'}`.slice(0, 160)
@@ -30,9 +30,7 @@ export async function createAdaptationProposals(req, res, next) {
   try {
     const database = requireDatabase()
     const { analysis, resume } = await loadOwnedSource(database, req.params.id, req.auth.sub)
-    await assertAiQuota(database, req.auth.sub, AI_FEATURES.CV_ADAPTATION)
-    const adaptation = await proposeCvAdaptation({ resume, analysis: analysis.analysis_result, jobDescription: analysis.job_description })
-    await consumeAiQuota(database, req.auth.sub, AI_FEATURES.CV_ADAPTATION)
+    const adaptation = await runWithAiQuota(database, req.auth.sub, AI_FEATURES.CV_ADAPTATION, ({ onRequestStart }) => proposeCvAdaptation({ resume, analysis: analysis.analysis_result, jobDescription: analysis.job_description, onRequestStart }))
     return res.json({ adaptation })
   } catch (error) { return next(error) }
 }

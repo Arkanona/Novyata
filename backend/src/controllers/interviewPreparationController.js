@@ -1,12 +1,12 @@
 import { requireDatabase } from '../config/database.js'
 import { AI_FEATURES } from '../config/plans.js'
-import { assertAiQuota, consumeAiQuota } from '../services/aiUsageService.js'
+import { runWithAiQuota } from '../services/aiUsageService.js'
 import { generateInterviewPreparation } from '../services/interviewPreparationService.js'
 import ApiError from '../utils/ApiError.js'
 import { compactSearchProfile } from '../utils/searchProfile.js'
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-const shorten = (value, max) => typeof value === 'string' ? value.trim().slice(0, max) : ''
+const cleanText = (value) => typeof value === 'string' ? value.trim() : ''
 
 function compactAnalysis(result) {
   if (!result || typeof result !== 'object') return null
@@ -30,12 +30,12 @@ async function getCompactResume(db, resumeId, userId) {
   ])
   if (!resume.rows[0]) throw new ApiError(404, 'CV introuvable.')
   return {
-    jobTitle: shorten(resume.rows[0].job_title, 160),
-    summary: shorten(resume.rows[0].summary, 700),
-    experiences: experiences.rows.map((item) => ({ role: shorten(item.job_title, 140), organization: shorten(item.company, 140), description: shorten(item.description, 500) })),
-    education: educations.rows.map((item) => ({ degree: shorten(item.degree, 150), school: shorten(item.school, 140), description: shorten(item.description, 250) })),
-    skills: skills.rows.map((item) => shorten(item.name, 80)).filter(Boolean),
-    languages: languages.rows.map((item) => ({ name: shorten(item.name, 60), level: shorten(item.level, 40) })),
+    jobTitle: cleanText(resume.rows[0].job_title),
+    summary: cleanText(resume.rows[0].summary),
+    experiences: experiences.rows.map((item) => ({ role: cleanText(item.job_title), organization: cleanText(item.company), description: cleanText(item.description) })),
+    education: educations.rows.map((item) => ({ degree: cleanText(item.degree), school: cleanText(item.school), description: cleanText(item.description) })),
+    skills: skills.rows.map((item) => cleanText(item.name)).filter(Boolean),
+    languages: languages.rows.map((item) => ({ name: cleanText(item.name), level: cleanText(item.level) })),
   }
 }
 
@@ -56,19 +56,17 @@ export async function createInterviewPreparation(req, res, next) {
         ? database.query('select job_description, analysis_result from job_analyses where id_job_analysis = $1 and id_user = $2', [application.id_job_analysis, req.auth.sub])
         : Promise.resolve({ rows: [] }),
     ])
-    await assertAiQuota(database, req.auth.sub, AI_FEATURES.INTERVIEW_PREPARATION)
     const analysis = analysisResult.rows[0]
-    const preparation = await generateInterviewPreparation({
-      company: shorten(application.company_name, 160),
-      jobTitle: shorten(application.job_title, 160),
+    const preparation = await runWithAiQuota(database, req.auth.sub, AI_FEATURES.INTERVIEW_PREPARATION, ({ onRequestStart }) => generateInterviewPreparation({
+      company: cleanText(application.company_name),
+      jobTitle: cleanText(application.job_title),
       searchProfile: compactSearchProfile(application.job_search_preferences),
       cv,
       offer: analysis ? {
-        jobDescription: shorten(analysis.job_description, 2500),
+        jobDescription: cleanText(analysis.job_description),
         analysis: compactAnalysis(analysis.analysis_result),
       } : null,
-    })
-    await consumeAiQuota(database, req.auth.sub, AI_FEATURES.INTERVIEW_PREPARATION)
+    }, { onRequestStart }))
     return res.json({ preparation })
   } catch (error) { return next(error) }
 }

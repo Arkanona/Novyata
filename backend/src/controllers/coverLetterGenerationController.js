@@ -2,13 +2,13 @@ import { requireDatabase } from '../config/database.js'
 import { generateCoverLetter } from '../services/coverLetterGenerationService.js'
 import ApiError from '../utils/ApiError.js'
 import { AI_FEATURES } from '../config/plans.js'
-import { assertAiQuota, consumeAiQuota } from '../services/aiUsageService.js'
+import { runWithAiQuota } from '../services/aiUsageService.js'
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 function optionalText(value, maxLength) {
   const text = typeof value === 'string' ? value.trim() : ''
-  return text ? text.slice(0, maxLength) : ''
+  return text && text.length <= maxLength ? text : ''
 }
 
 function analysisTextList(value, limit = 12) {
@@ -39,7 +39,9 @@ function validateRequest(body) {
   const errors = {}
   if (!resumeId || !uuidPattern.test(resumeId)) errors.resumeId = 'Sélectionnez un CV valide.'
   if (!jobDescription) errors.jobDescription = 'Collez le texte de l’offre avant de générer une lettre.'
-  if (jobDescription.length > 20000) errors.jobDescription = 'L’offre ne peut pas dépasser 20 000 caractères.'
+  if (jobDescription.length > 12000) errors.jobDescription = 'L’offre ne peut pas dépasser 12 000 caractères.'
+  if (typeof body.companyName === 'string' && body.companyName.trim().length > 160) errors.companyName = 'Le nom de l’entreprise ne peut pas dépasser 160 caractères.'
+  if (typeof body.jobTitle === 'string' && body.jobTitle.trim().length > 160) errors.jobTitle = 'Le poste ne peut pas dépasser 160 caractères.'
   if (Object.keys(errors).length) throw new ApiError(400, 'Certaines informations sont invalides.', errors)
   return {
     resumeId,
@@ -64,15 +66,10 @@ export async function createGeneratedCoverLetter(req, res, next) {
       database.query('select name, level from skills where id_resume = $1', [resumeId]),
       database.query('select name, level from languages where id_resume = $1', [resumeId]),
     ])
-    await assertAiQuota(database, req.auth.sub, AI_FEATURES.COVER_LETTER_GENERATION)
-    const generation = await generateCoverLetter({
+    const generation = await runWithAiQuota(database, req.auth.sub, AI_FEATURES.COVER_LETTER_GENERATION, ({ onRequestStart }) => generateCoverLetter({
       resume: { ...resume, experiences: experiences.rows, educations: educations.rows, skills: skills.rows, languages: languages.rows },
-      jobDescription,
-      companyName,
-      jobTitle,
-      analysis,
-    })
-    await consumeAiQuota(database, req.auth.sub, AI_FEATURES.COVER_LETTER_GENERATION)
+      jobDescription, companyName, jobTitle, analysis, onRequestStart,
+    }))
     return res.json({ generation })
   } catch (error) { return next(error) }
 }

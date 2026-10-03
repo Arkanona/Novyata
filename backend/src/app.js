@@ -2,6 +2,7 @@ import cors from 'cors'
 import express from 'express'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
+import aiLimiter from './middleware/aiRateLimit.js'
 import applicationsRouter from './routes/applications.js'
 import authRouter from './routes/auth.js'
 import billingRouter from './routes/billing.js'
@@ -41,13 +42,6 @@ const apiLimiter = rateLimit({
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: { error: { message: 'Trop de requêtes. Réessayez dans quelques instants.' } },
-})
-const aiLimiter = rateLimit({
-  windowMs: numericEnvironment('RATE_LIMIT_WINDOW_MS', 15 * 60 * 1000),
-  max: numericEnvironment('AI_RATE_LIMIT_MAX', 20),
-  standardHeaders: 'draft-8',
-  legacyHeaders: false,
-  message: { error: { message: 'Trop de demandes IA. Réessayez dans quelques instants.' } },
 })
 const offerImportLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,

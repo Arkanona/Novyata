@@ -10,7 +10,10 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   webServer: {
-    command: 'npm --prefix ../frontend run dev -- --host 127.0.0.1 --port 4173',
+    // Launch Vite directly so Playwright owns the server process and Windows
+    // does not leave an intermediate npm.cmd child alive after the test run.
+    command: 'node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 4173',
+    cwd: '../frontend',
     url: 'http://127.0.0.1:4173',
     reuseExistingServer: !process.env.CI,
   },

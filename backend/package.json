@@ -8,7 +8,9 @@
     "start": "node src/server.js",
     "test": "vitest run --exclude e2e/**",
     "test:coverage": "vitest run --coverage --exclude e2e/**",
-    "test:e2e": "playwright test -c playwright.config.js"
+    "test:e2e": "playwright test -c playwright.config.js",
+    "estimate:free-ai-cost": "node scripts/estimateFreePlanAiCost.js",
+    "estimate:pro-ai-cost": "node scripts/estimateProPlanAiCost.js"
   },
   "dependencies": {
     "bcrypt": "latest",

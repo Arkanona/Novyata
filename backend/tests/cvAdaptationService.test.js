@@ -41,4 +41,18 @@ describe('cvAdaptationService', () => {
   it('rejects more than six proposals', () => {
     expect(() => validateAdaptation({ proposals: Array.from({ length: 7 }, (_, index) => ({ ...proposal, id: `summary-${index}`, targetIndex: index })) }, resume)).toThrow('réponse invalide')
   })
+
+  it('rejects an oversized proposal instead of silently clipping the generated text', () => {
+    expect(() => validateAdaptation({ proposals: [{ ...proposal, proposedText: 'x'.repeat(2001) }] }, resume)).toThrow('réponse invalide')
+  })
+
+  it('preserves complete CV source content and rejects an oversized request before dispatch', async () => {
+    vi.stubEnv('OPENAI_API_KEY', 'test-key')
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const fullSummary = 'Profil détaillé '.repeat(3_000)
+    await expect(proposeCvAdaptation({ resume: { ...resume, summary: fullSummary }, analysis: {}, jobDescription: 'Offre.' }))
+      .rejects.toMatchObject({ statusCode: 413 })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
 })

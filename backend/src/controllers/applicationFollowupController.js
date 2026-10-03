@@ -1,7 +1,7 @@
 import { requireDatabase } from '../config/database.js'
 import { followupTypes } from '../config/applications.js'
 import { AI_FEATURES, capabilitiesFor } from '../config/plans.js'
-import { assertAiQuota, consumeAiQuota } from '../services/aiUsageService.js'
+import { runWithAiQuota } from '../services/aiUsageService.js'
 import { generateFollowup } from '../services/applicationFollowupService.js'
 import ApiError from '../utils/ApiError.js'
 
@@ -12,9 +12,7 @@ function validId(id) { if (!uuid.test(id)) throw new ApiError(400, 'Identifiant 
 export async function createFollowup(req, res, next) { try {
   validId(req.params.id); const type = followupTypes.includes(req.body?.type) ? req.body.type : 'Première relance'; const database = requireDatabase(); const application = await owned(database, req.params.id, req.auth.sub)
   if (type !== 'Première relance' && !capabilitiesFor(application.plan).advancedFollowups) throw new ApiError(403, 'Les relances avancées sont disponibles avec Novyata Pro.', { upgrade: true, feature: 'advancedFollowups' })
-  await assertAiQuota(database, req.auth.sub, AI_FEATURES.APPLICATION_FOLLOWUP)
-  const generation = await generateFollowup({ type, company: application.company_name, jobTitle: application.job_title, applicationDate: application.application_date, status: application.status, notes: application.notes || undefined })
-  await consumeAiQuota(database, req.auth.sub, AI_FEATURES.APPLICATION_FOLLOWUP)
+  const generation = await runWithAiQuota(database, req.auth.sub, AI_FEATURES.APPLICATION_FOLLOWUP, ({ onRequestStart }) => generateFollowup({ type, company: application.company_name, jobTitle: application.job_title, applicationDate: application.application_date, status: application.status, notes: application.notes || undefined }, { onRequestStart }))
   const result = await database.query('insert into application_followups (id_application, type, content) values ($1, $2, $3) returning id_followup, type, content, sent_at, created_at, updated_at', [req.params.id, type, generation.content])
   return res.status(201).json({ followup: result.rows[0] })
 } catch (error) { return next(error) } }
@@ -42,9 +40,7 @@ export async function createThankYou(req, res, next) { try {
   if (!capabilitiesFor(application.plan).advancedFollowups) throw new ApiError(403, 'Les remerciements après entretien sont disponibles avec Novyata Pro.', { upgrade: true, feature: 'advancedFollowups' })
   const interview = await database.query('select interview_date, interview_type, key_points, next_steps, notes from interviews where id_application = $1 order by interview_date desc nulls last, created_at desc limit 1', [req.params.id])
   if (!interview.rows[0]) throw new ApiError(400, 'Ajoutez un compte-rendu d’entretien avant de préparer un remerciement.')
-  await assertAiQuota(database, req.auth.sub, AI_FEATURES.APPLICATION_FOLLOWUP)
-  const generation = await generateFollowup({ kind: 'thank_you', company: application.company_name, jobTitle: application.job_title, interview: interview.rows[0] })
-  await consumeAiQuota(database, req.auth.sub, AI_FEATURES.APPLICATION_FOLLOWUP)
+  const generation = await runWithAiQuota(database, req.auth.sub, AI_FEATURES.APPLICATION_FOLLOWUP, ({ onRequestStart }) => generateFollowup({ kind: 'thank_you', company: application.company_name, jobTitle: application.job_title, interview: interview.rows[0] }, { onRequestStart }))
   const result = await database.query('insert into application_followups (id_application, type, content) values ($1, $2, $3) returning id_followup, type, content, sent_at, created_at, updated_at', [req.params.id, 'Remerciement', generation.content])
   return res.status(201).json({ followup: result.rows[0] })
 } catch (error) { return next(error) } }
